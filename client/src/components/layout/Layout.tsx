@@ -124,12 +124,12 @@ export default function Layout({ children }: LayoutProps) {
               <button
                 type="button"
                 onClick={logout}
-                className="text-danger p-1.5 rounded-xl border border-danger/20 bg-danger/10 hover:bg-danger hover:text-white transition active:scale-95 flex items-center gap-1"
-                title="Log out"
-                aria-label="Log out"
+                className="text-danger p-1.5 px-2 rounded-xl border border-danger/20 bg-danger/10 hover:bg-danger hover:text-white transition active:scale-95 flex items-center gap-1"
+                title="Switch Reviewer / Log out"
+                aria-label="Switch Reviewer"
               >
                 <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                <span className="text-[11px] font-bold sm:hidden">Exit</span>
+                <span className="text-[11px] font-bold">Switch</span>
               </button>
             </div>
           </div>

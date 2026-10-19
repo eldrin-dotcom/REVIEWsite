@@ -16,28 +16,47 @@ const COOKIE_OPTIONS = {
   path: '/',
 };
 
-// Login
+// Get Available Profiles
+authRouter.get('/profiles', async (_req, res) => {
+  try {
+    const db = getDb();
+    const allUsers = await db
+      .select({
+        id: users.id,
+        username: users.username,
+        displayName: users.displayName,
+        theme: users.theme,
+      })
+      .from(users)
+      .all();
+
+    return res.json({
+      success: true,
+      data: allUsers,
+    });
+  } catch (error) {
+    console.error('Get profiles error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to fetch profiles' });
+  }
+});
+
+// Login / Select Profile
 authRouter.post('/login', async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username } = req.body;
 
-    if (!username || !password) {
-      return res.status(400).json({ success: false, error: 'Username and password required' });
+    if (!username) {
+      return res.status(400).json({ success: false, error: 'Username or profile required' });
     }
 
     const db = getDb();
     const user = await db.select().from(users).where(eq(users.username, username.trim().toLowerCase())).get();
 
     if (!user) {
-      return res.status(401).json({ success: false, error: 'Invalid username or password' });
+      return res.status(404).json({ success: false, error: 'Reviewer profile not found' });
     }
 
-    const validPassword = await bcrypt.compare(password, user.passwordHash);
-    if (!validPassword) {
-      return res.status(401).json({ success: false, error: 'Invalid username or password' });
-    }
-
-    // Set signed session cookie
+    // Set signed session cookie directly
     const sessionData = JSON.stringify({ userId: user.id, username: user.username });
     res.cookie('session', sessionData, COOKIE_OPTIONS);
 
@@ -50,12 +69,12 @@ authRouter.post('/login', async (req, res) => {
           displayName: user.displayName,
           theme: user.theme,
         },
-        message: 'Login successful',
+        message: 'Reviewer profile selected successfully',
       },
     });
   } catch (error) {
     console.error('Login error:', error);
-    return res.status(500).json({ success: false, error: 'Internal server error during login' });
+    return res.status(500).json({ success: false, error: 'Internal server error during profile selection' });
   }
 });
 

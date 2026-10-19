@@ -1,6 +1,6 @@
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { Palette, Sun, Moon, Heart, User, Trophy, Check, RotateCcw, AlertTriangle, Lock, KeyRound, LogOut } from 'lucide-react';
+import { Palette, Sun, Moon, Heart, User, Trophy, Check, RotateCcw, AlertTriangle, Users } from 'lucide-react';
 import { useState } from 'react';
 import type { Theme } from 'shared';
 
@@ -9,14 +9,6 @@ export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
   const [resetting, setResetting] = useState(false);
   const [resetStatus, setResetStatus] = useState('');
-
-  // Password management state
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [passwordStatus, setPasswordStatus] = useState('');
-  const [passwordError, setPasswordError] = useState('');
-  const [updatingPassword, setUpdatingPassword] = useState(false);
 
   const handleResetProgress = async () => {
     if (!confirm('Are you sure you want to reset your progress? This will delete all your quiz history and accuracy scores for this account.')) {
@@ -42,48 +34,6 @@ export default function SettingsPage() {
       alert('Error resetting progress.');
     } finally {
       setResetting(false);
-    }
-  };
-
-  const handleUpdatePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setPasswordError('');
-    setPasswordStatus('');
-
-    if (newPassword !== confirmPassword) {
-      setPasswordError('New password and confirmation do not match');
-      return;
-    }
-
-    if (newPassword.length < 6) {
-      setPasswordError('New password must be at least 6 characters long');
-      return;
-    }
-
-    setUpdatingPassword(true);
-
-    try {
-      const res = await fetch('/api/auth/password', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ currentPassword, newPassword }),
-      });
-
-      const json = await res.json();
-      if (res.ok && json.success) {
-        setPasswordStatus('✓ Password updated successfully!');
-        setCurrentPassword('');
-        setNewPassword('');
-        setConfirmPassword('');
-      } else {
-        setPasswordError(json.error || 'Failed to update password');
-      }
-    } catch (err) {
-      console.error('Password update error:', err);
-      setPasswordError('Network error while updating password');
-    } finally {
-      setUpdatingPassword(false);
     }
   };
 
@@ -219,88 +169,10 @@ export default function SettingsPage() {
         <button
           type="button"
           onClick={logout}
-          className="w-full py-2.5 px-4 rounded-xl border border-danger/20 text-danger bg-danger/10 hover:bg-danger hover:text-white font-bold text-xs transition flex items-center justify-center gap-2 active:scale-95"
+          className="w-full py-2.5 px-4 rounded-xl border border-primary/20 text-primary bg-primary/10 hover:bg-primary hover:text-white font-bold text-xs transition flex items-center justify-center gap-2 active:scale-95 shadow-xs"
         >
-          <LogOut className="w-4 h-4" /> Log Out of Account
+          <Users className="w-4 h-4" /> Switch Reviewer / Change Profile
         </button>
-      </div>
-
-      {/* Account Security / Change Password */}
-      <div className="bg-card border border-border rounded-2xl p-6 shadow-xs space-y-4">
-        <h2 className="text-sm font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
-          <KeyRound className="w-4 h-4 text-primary" /> Account Security & Password
-        </h2>
-        <p className="text-xs text-text-secondary leading-relaxed">
-          Update your login password before deploying to protect your review progress.
-        </p>
-
-        {passwordStatus && (
-          <div className="p-3 rounded-xl bg-success/10 border border-success/30 text-success text-xs font-semibold">
-            {passwordStatus}
-          </div>
-        )}
-
-        {passwordError && (
-          <div className="p-3 rounded-xl bg-danger/10 border border-danger/30 text-danger text-xs font-semibold">
-            {passwordError}
-          </div>
-        )}
-
-        <form onSubmit={handleUpdatePassword} className="space-y-3">
-          <div>
-            <label className="block text-xs font-semibold text-text-secondary mb-1">
-              Current Password
-            </label>
-            <input
-              type="password"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              required
-              className="w-full px-3.5 py-2 rounded-xl bg-bg-secondary border border-border text-text-primary text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder="Enter current password"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-text-secondary mb-1">
-                New Password (min 6 characters)
-              </label>
-              <input
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                required
-                minLength={6}
-                className="w-full px-3.5 py-2 rounded-xl bg-bg-secondary border border-border text-text-primary text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                placeholder="Enter new password"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-text-secondary mb-1">
-                Confirm New Password
-              </label>
-              <input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                minLength={6}
-                className="w-full px-3.5 py-2 rounded-xl bg-bg-secondary border border-border text-text-primary text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                placeholder="Confirm new password"
-              />
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={updatingPassword}
-            className="py-2.5 px-4 rounded-xl font-bold text-xs text-white bg-primary hover:bg-primary-hover transition flex items-center gap-2 disabled:opacity-50"
-          >
-            <Lock className="w-3.5 h-3.5" />
-            {updatingPassword ? 'Updating Password...' : 'Save New Password'}
-          </button>
-        </form>
       </div>
 
       {/* Progress Reset / Danger Zone */}

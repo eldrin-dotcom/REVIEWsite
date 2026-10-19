@@ -13,7 +13,7 @@ export type Theme = 'light' | 'dark' | 'pink';
 
 export interface LoginRequest {
   username: string;
-  password: string;
+  password?: string;
 }
 
 export interface LoginResponse {

@@ -4,7 +4,7 @@ import type { User, Theme } from 'shared';
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (username: string, password: string) => Promise<void>;
+  login: (username: string, password?: string) => Promise<void>;
   logout: () => Promise<void>;
   updateTheme: (theme: Theme) => Promise<void>;
 }
@@ -36,7 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     checkSession();
   }, [checkSession]);
 
-  const login = useCallback(async (username: string, password: string) => {
+  const login = useCallback(async (username: string, password?: string) => {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
