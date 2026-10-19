@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import MathRenderer from '../components/math/MathRenderer';
 import DoodleScratchpad from '../components/quiz/DoodleScratchpad';
-import FormulaSheetModal from '../components/quiz/FormulaSheetModal';
 import {
   Timer,
   Zap,
@@ -13,7 +12,6 @@ import {
   ArrowRight,
   Clock,
   PenTool,
-  BookOpen,
   Star,
 } from 'lucide-react';
 import type { ExamTypeWithSubjects, QuizQuestion, QuizSession } from 'shared';
@@ -40,7 +38,6 @@ export default function ExamPage() {
   const [secondsRemaining, setSecondsRemaining] = useState<number>(0);
   const [submittingExam, setSubmittingExam] = useState(false);
   const [showScratchpad, setShowScratchpad] = useState(false);
-  const [showFormulaSheet, setShowFormulaSheet] = useState(false);
   const [bookmarkedIds, setBookmarkedIds] = useState<Set<number>>(new Set());
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -421,16 +418,6 @@ export default function ExamPage() {
             <span className="hidden sm:inline">Scratchpad</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => setShowFormulaSheet(true)}
-            className="py-1.5 sm:py-2 px-2 sm:px-3 rounded-xl border border-border bg-bg-secondary hover:bg-card text-text-primary text-xs font-bold transition flex items-center gap-1.5 active:scale-95"
-            title="View electronics formulas & resistor color codes"
-          >
-            <BookOpen className="w-3.5 h-3.5 text-primary" />
-            <span className="hidden sm:inline">Formulas</span>
-          </button>
-
           <div
             className={`px-2 sm:px-3.5 py-1.5 sm:py-2 rounded-xl border font-mono font-bold text-xs sm:text-base flex items-center gap-1 sm:gap-1.5 transition ${
               isTimeLow
@@ -591,12 +578,6 @@ export default function ExamPage() {
       <DoodleScratchpad
         isOpen={showScratchpad}
         onClose={() => setShowScratchpad(false)}
-      />
-
-      {/* Electronics Quick Reference Formula Sheet Modal */}
-      <FormulaSheetModal
-        isOpen={showFormulaSheet}
-        onClose={() => setShowFormulaSheet(false)}
       />
     </div>
   );

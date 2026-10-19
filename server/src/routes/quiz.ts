@@ -13,7 +13,7 @@ quizRouter.post('/start', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.userId!;
     const body = req.body as StartQuizRequest;
-    const { mode, examTypeId, subjectId, topicId, questionType, count, timeLimitSeconds } = body;
+    const { mode, examTypeId, subjectId, topicId, questionType, count, timeLimitSeconds, excludeAnswered } = body;
 
     if (!mode || (mode !== 'practice' && mode !== 'exam')) {
       return res.status(400).json({ success: false, error: 'Invalid quiz mode' });
@@ -55,10 +55,31 @@ quizRouter.post('/start', async (req: AuthenticatedRequest, res: Response) => {
       }
     }
 
+    // Optional: exclude questions the current user has already answered
+    if (excludeAnswered) {
+      const answeredRows = await db
+        .selectDistinct({ questionId: quizAnswers.questionId })
+        .from(quizAnswers)
+        .innerJoin(quizSessions, eq(quizAnswers.sessionId, quizSessions.id))
+        .where(
+          and(
+            eq(quizSessions.userId, userId),
+            sql`${quizAnswers.selectedAnswer} IS NOT NULL`
+          )
+        )
+        .all();
+
+      const answeredIds = new Set(answeredRows.map(r => r.questionId));
+      candidateQuestions = candidateQuestions.filter(q => !answeredIds.has(q.id));
+    }
+
     if (candidateQuestions.length === 0) {
+      const errorMsg = excludeAnswered
+        ? 'All questions matching your selection have already been answered! Uncheck "Exclude already answered questions" to review them again.'
+        : 'No questions available matching your selection. Please upload review materials first.';
       return res.status(400).json({
         success: false,
-        error: 'No questions available matching your selection. Please upload review materials first.',
+        error: errorMsg,
       });
     }
 

@@ -21,10 +21,11 @@ function inferQuestionType(q: { type?: string; text: string; choices: string[]; 
   return computationIndicator.test(text) ? 'computation' : 'conceptual';
 }
 
-// Get all exam types with subjects and topics count
-questionsRouter.get('/hierarchy', async (_req, res) => {
+// Get all exam types with subjects and topics count (including user's answered count)
+questionsRouter.get('/hierarchy', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const db = getDb();
+    const userId = req.userId;
     const allExamTypes = await db.select().from(examTypes).all();
     const allSubjects = await db.select().from(subjects).all();
     const allTopics = await db.select().from(topics).all();
@@ -44,6 +45,31 @@ questionsRouter.get('/hierarchy', async (_req, res) => {
       countMap.set(qc.topicId, Number(qc.count));
     }
 
+    // Count user's unique answered questions per topic
+    const answeredCountMap = new Map<number, number>();
+    if (userId) {
+      const answeredCounts = await db
+        .select({
+          topicId: questions.topicId,
+          count: sql<number>`count(distinct ${questions.id})`.as('count'),
+        })
+        .from(quizAnswers)
+        .innerJoin(quizSessions, eq(quizAnswers.sessionId, quizSessions.id))
+        .innerJoin(questions, eq(quizAnswers.questionId, questions.id))
+        .where(
+          and(
+            eq(quizSessions.userId, userId),
+            sql`${quizAnswers.selectedAnswer} IS NOT NULL`
+          )
+        )
+        .groupBy(questions.topicId)
+        .all();
+
+      for (const ac of answeredCounts) {
+        answeredCountMap.set(ac.topicId, Number(ac.count));
+      }
+    }
+
     const result = allExamTypes.map((et) => {
       const etSubjects = allSubjects
         .filter((s) => s.examTypeId === et.id)
@@ -53,6 +79,7 @@ questionsRouter.get('/hierarchy', async (_req, res) => {
             .map((t) => ({
               ...t,
               questionCount: countMap.get(t.id) || 0,
+              answeredCount: answeredCountMap.get(t.id) || 0,
             }));
           return {
             ...s,

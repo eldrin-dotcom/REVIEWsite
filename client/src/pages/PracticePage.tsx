@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import MathRenderer from '../components/math/MathRenderer';
 import DoodleScratchpad from '../components/quiz/DoodleScratchpad';
-import FormulaSheetModal from '../components/quiz/FormulaSheetModal';
 import {
   BookOpen,
   Zap,
@@ -50,8 +49,8 @@ export default function PracticePage() {
   const [startingQuiz, setStartingQuiz] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [showScratchpad, setShowScratchpad] = useState(false);
-  const [showFormulaSheet, setShowFormulaSheet] = useState(false);
   const [bookmarkedIds, setBookmarkedIds] = useState<Set<number>>(new Set());
+  const [excludeAnswered, setExcludeAnswered] = useState(false);
 
   const location = useLocation();
 
@@ -100,35 +99,34 @@ export default function PracticePage() {
     }
   };
 
-  // Load questions hierarchy on mount
-  useEffect(() => {
-    async function fetchHierarchy() {
-      try {
-        const res = await fetch('/api/questions/hierarchy', { credentials: 'include' });
-        if (res.ok) {
-          const json = await res.json();
-          if (json.success && json.data) {
-            setHierarchy(json.data);
-            if (json.data.length > 0) {
-              const firstEt = json.data[0];
-              setSelectedExamTypeId(firstEt.id);
-              if (firstEt.subjects.length > 0) {
-                const firstSub = firstEt.subjects[0];
-                setSelectedSubjectId(firstSub.id);
-                if (firstSub.topics.length > 0) {
-                  setSelectedTopicId(firstSub.topics[0].id);
-                }
+  // Load questions hierarchy (includes updated answeredCount)
+  const fetchHierarchy = async () => {
+    try {
+      const res = await fetch('/api/questions/hierarchy', { credentials: 'include' });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data) {
+          setHierarchy(json.data);
+          if (json.data.length > 0) {
+            setSelectedExamTypeId((prev) => prev || json.data[0].id);
+            const firstEt = json.data[0];
+            if (firstEt.subjects.length > 0) {
+              setSelectedSubjectId((prev) => prev || firstEt.subjects[0].id);
+              if (firstEt.subjects[0].topics.length > 0) {
+                setSelectedTopicId((prev) => prev || firstEt.subjects[0].topics[0].id);
               }
             }
           }
         }
-      } catch (err) {
-        console.error('Failed to load question hierarchy:', err);
-      } finally {
-        setLoadingHierarchy(false);
       }
+    } catch (err) {
+      console.error('Failed to load question hierarchy:', err);
+    } finally {
+      setLoadingHierarchy(false);
     }
+  };
 
+  useEffect(() => {
     fetchHierarchy();
   }, []);
 
@@ -180,6 +178,7 @@ export default function PracticePage() {
           topicId: selectedTopicId,
           questionType: questionTypeFilter,
           count: itemCount,
+          excludeAnswered,
         }),
       });
 
@@ -307,6 +306,7 @@ export default function PracticePage() {
                 onClick={() => {
                   setActiveSession(null);
                   setQuizFinished(false);
+                  fetchHierarchy();
                 }}
                 className="w-full sm:w-auto py-2.5 px-6 rounded-xl font-bold text-white bg-primary hover:bg-primary-hover transition text-sm shadow-sm"
               >
@@ -408,23 +408,33 @@ export default function PracticePage() {
                 </label>
                 {currentSubject.topics.length > 0 ? (
                   <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
-                    {currentSubject.topics.map((t) => (
-                      <button
-                        key={t.id}
-                        type="button"
-                        onClick={() => setSelectedTopicId(t.id)}
-                        className={`w-full p-3 rounded-xl border text-left flex items-center justify-between text-sm transition ${
-                          selectedTopicId === t.id
-                            ? 'border-primary bg-primary/10 text-primary font-bold shadow-xs'
-                            : 'border-border bg-bg-secondary text-text-primary hover:border-primary/50'
-                        }`}
-                      >
-                        <span className="truncate pr-2">{t.name}</span>
-                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-bg-secondary border border-border text-text-secondary whitespace-nowrap">
-                          {t.questionCount} {t.questionCount === 1 ? 'item' : 'items'}
-                        </span>
-                      </button>
-                    ))}
+                    {currentSubject.topics.map((t) => {
+                      const answered = t.answeredCount || 0;
+                      return (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => setSelectedTopicId(t.id)}
+                          className={`w-full p-3 rounded-xl border text-left flex items-center justify-between text-sm transition ${
+                            selectedTopicId === t.id
+                              ? 'border-primary bg-primary/10 text-primary font-bold shadow-xs'
+                              : 'border-border bg-bg-secondary text-text-primary hover:border-primary/50'
+                          }`}
+                        >
+                          <span className="truncate pr-2">{t.name}</span>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {answered > 0 && (
+                              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                {answered} done
+                              </span>
+                            )}
+                            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-bg-secondary border border-border text-text-secondary whitespace-nowrap">
+                              {t.questionCount} {t.questionCount === 1 ? 'item' : 'items'}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="p-4 rounded-xl bg-bg-secondary border border-border text-center text-text-secondary text-sm">
@@ -506,6 +516,53 @@ export default function PracticePage() {
               </div>
             </div>
 
+            {/* 6. Option to Exclude Already Answered Questions */}
+            {currentTopic && (
+              <div className="pt-1">
+                <label
+                  className={`flex items-center justify-between p-3.5 rounded-xl border transition cursor-pointer select-none ${
+                    excludeAnswered
+                      ? 'border-primary/50 bg-primary/5 shadow-xs'
+                      : 'border-border bg-bg-secondary hover:bg-card/70'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition ${
+                        excludeAnswered
+                          ? 'bg-primary text-white shadow-xs'
+                          : 'bg-bg-secondary text-text-secondary border border-border'
+                      }`}
+                    >
+                      <CheckCircle2 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-bold text-text-primary flex items-center gap-2">
+                        <span>Exclude already answered questions</span>
+                        {currentTopic.answeredCount !== undefined && currentTopic.answeredCount > 0 && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/20">
+                            {Math.max(0, currentTopic.questionCount - currentTopic.answeredCount)} new left
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-text-secondary mt-0.5">
+                        {currentTopic.answeredCount !== undefined &&
+                        currentTopic.answeredCount >= currentTopic.questionCount
+                          ? 'All questions in this topic have been answered. Keep unchecked to review again.'
+                          : 'Drill only fresh questions you haven\'t answered yet.'}
+                      </div>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={excludeAnswered}
+                    onChange={(e) => setExcludeAnswered(e.target.checked)}
+                    className="w-5 h-5 accent-primary rounded cursor-pointer shrink-0 ml-3"
+                  />
+                </label>
+              </div>
+            )}
+
             {/* Start Button */}
             <button
               type="button"
@@ -564,16 +621,6 @@ export default function PracticePage() {
             <span className="hidden sm:inline">Scratchpad</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => setShowFormulaSheet(true)}
-            className="py-1.5 px-2.5 rounded-xl border border-border bg-bg-secondary hover:bg-card text-text-primary text-xs font-bold transition flex items-center gap-1.5 active:scale-95"
-            title="View electronics formulas & resistor color codes"
-          >
-            <BookOpen className="w-3.5 h-3.5 text-primary" />
-            <span className="hidden sm:inline">Formulas</span>
-          </button>
-
           <div className="text-right pl-1 border-l border-border">
             <span className="text-[10px] font-semibold text-text-secondary block">Score</span>
             <span className="text-base sm:text-lg font-extrabold text-primary">
@@ -586,6 +633,7 @@ export default function PracticePage() {
             onClick={() => {
               if (confirm('Are you sure you want to exit this practice drill?')) {
                 setActiveSession(null);
+                fetchHierarchy();
               }
             }}
             className="text-xs text-text-secondary hover:text-danger px-2.5 py-1.5 rounded-lg border border-border hover:bg-bg-secondary transition"
@@ -743,12 +791,6 @@ export default function PracticePage() {
       <DoodleScratchpad
         isOpen={showScratchpad}
         onClose={() => setShowScratchpad(false)}
-      />
-
-      {/* Electronics Quick Reference Formula Sheet Modal */}
-      <FormulaSheetModal
-        isOpen={showFormulaSheet}
-        onClose={() => setShowFormulaSheet(false)}
       />
     </div>
   );

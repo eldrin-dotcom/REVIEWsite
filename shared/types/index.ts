@@ -98,6 +98,7 @@ export interface SubjectWithTopics extends Subject {
 
 export interface TopicWithCount extends Topic {
   questionCount: number;
+  answeredCount?: number;
 }
 
 export interface ExamTypeWithSubjects extends ExamType {
@@ -118,6 +119,7 @@ export interface StartQuizRequest {
   questionType: QuestionTypeFilter;
   count: number;
   timeLimitSeconds?: number; // Required for exam mode
+  excludeAnswered?: boolean; // Exclude questions already answered by user
 }
 
 export interface QuizSession {
