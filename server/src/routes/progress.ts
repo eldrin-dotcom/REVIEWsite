@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
-import { eq, desc, inArray } from 'drizzle-orm';
+import { eq, desc, inArray, and, sql } from 'drizzle-orm';
 import { getDb } from '../db/index.js';
-import { examTypes, subjects, topics, questions, quizSessions, quizAnswers } from '../db/schema.js';
+import { examTypes, subjects, topics, questions, quizSessions, quizAnswers, users, appSettings } from '../db/schema.js';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth.js';
 
 export const progressRouter = Router();
@@ -260,5 +260,213 @@ progressRouter.delete('/reset', async (req: AuthenticatedRequest, res: Response)
   } catch (error) {
     console.error('Reset progress error:', error);
     return res.status(500).json({ success: false, error: 'Failed to reset progress' });
+  }
+});
+
+// Helper to get local Philippine/UTC+8 date string (YYYY-MM-DD)
+function getLocalDateStr(d = new Date()): string {
+  const phTime = new Date(d.getTime() + 8 * 60 * 60 * 1000);
+  return phTime.toISOString().slice(0, 10);
+}
+
+// Duo Streak & Dino Pet endpoint
+progressRouter.get('/duo-streak', async (_req: AuthenticatedRequest, res: Response) => {
+  try {
+    const db = getDb();
+    const todayStr = getLocalDateStr();
+
+    // 1. Fetch John & Hon user records
+    const allUsers = await db
+      .select({
+        id: users.id,
+        username: users.username,
+        displayName: users.displayName,
+      })
+      .from(users)
+      .all();
+
+    // 2. Fetch app settings (countdown & dino name)
+    const settingsList = await db.select().from(appSettings).all();
+    const settingsMap = new Map(settingsList.map((s) => [s.key, s.value]));
+
+    const targetDate = settingsMap.get('exam_target_date') || '2026-10-25T08:00:00';
+    const examTitle = settingsMap.get('exam_title') || 'Electronics Technician (ECT) Licensure Examination';
+    const dinoName = settingsMap.get('dino_pet_name') || 'Rexy';
+
+    // 3. Count daily answers per user across all dates
+    // Groups by userId and date string (YYYY-MM-DD)
+    const dailyGroupCounts = await db
+      .select({
+        userId: quizSessions.userId,
+        dateStr: sql<string>`substr(coalesce(${quizAnswers.answeredAt}, ${quizSessions.startedAt}), 1, 10)`,
+        count: sql<number>`count(*)`,
+      })
+      .from(quizAnswers)
+      .innerJoin(quizSessions, eq(quizAnswers.sessionId, quizSessions.id))
+      .groupBy(
+        quizSessions.userId,
+        sql`substr(coalesce(${quizAnswers.answeredAt}, ${quizSessions.startedAt}), 1, 10)`
+      )
+      .all();
+
+    const countMap = new Map<string, number>();
+    for (const row of dailyGroupCounts) {
+      if (row.userId && row.dateStr) {
+        countMap.set(`${row.userId}:${row.dateStr}`, Number(row.count) || 0);
+      }
+    }
+
+    // 4. Calculate today's status for each user
+    const usersProgress = allUsers.map((u) => {
+      const answeredToday = countMap.get(`${u.id}:${todayStr}`) || 0;
+      return {
+        userId: u.id,
+        username: u.username,
+        displayName: u.displayName,
+        answeredToday,
+        targetToday: 10,
+        completedToday: answeredToday >= 10,
+      };
+    });
+
+    const completedToday = usersProgress.length > 0 && usersProgress.every((u) => u.completedToday);
+
+    // 5. Calculate consecutive Duo Streak (both users >= 10 questions on the same day)
+    function isDuoDaySuccessful(dateStr: string): boolean {
+      if (allUsers.length === 0) return false;
+      return allUsers.every((u) => {
+        const c = countMap.get(`${u.id}:${dateStr}`) || 0;
+        return c >= 10;
+      });
+    }
+
+    let currentStreak = 0;
+    const checkDate = new Date(Date.now() + 8 * 60 * 60 * 1000);
+
+    if (completedToday) {
+      currentStreak++;
+      checkDate.setDate(checkDate.getDate() - 1);
+    } else {
+      checkDate.setDate(checkDate.getDate() - 1);
+    }
+
+    // Walk backwards through previous days
+    for (let i = 0; i < 365; i++) {
+      const prevDateStr = checkDate.toISOString().slice(0, 10);
+      if (isDuoDaySuccessful(prevDateStr)) {
+        currentStreak++;
+        checkDate.setDate(checkDate.getDate() - 1);
+      } else {
+        break;
+      }
+    }
+
+    // If streak is active from yesterday but not completed yet today, it is at risk
+    const yesterdayDate = new Date(Date.now() + 8 * 60 * 60 * 1000);
+    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+    const yesterdaySuccessful = isDuoDaySuccessful(yesterdayDate.toISOString().slice(0, 10));
+    const atRisk = !completedToday && yesterdaySuccessful;
+
+    // 6. Dino Pet Stage & Mood
+    let stage: 'egg' | 'baby' | 'study' | 'tech' | 'top_notcher' = 'baby';
+    let title = 'Baby Dino';
+    if (currentStreak >= 30) {
+      stage = 'top_notcher';
+      title = 'Top Notcher Dino';
+    } else if (currentStreak >= 14) {
+      stage = 'tech';
+      title = 'Engineer Dino';
+    } else if (currentStreak >= 7) {
+      stage = 'study';
+      title = 'Study Dino';
+    } else if (currentStreak >= 3) {
+      stage = 'baby';
+      title = 'Active Dino';
+    } else {
+      stage = 'egg';
+      title = 'Baby Dino';
+    }
+
+    let mood: 'celebrating' | 'happy' | 'waiting' | 'sleepy' = 'sleepy';
+    if (completedToday) {
+      mood = 'celebrating';
+    } else {
+      const anyDone = usersProgress.some((u) => u.completedToday);
+      if (anyDone) {
+        mood = 'waiting';
+      } else {
+        mood = currentStreak > 0 ? 'waiting' : 'sleepy';
+      }
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        currentStreak,
+        completedToday,
+        atRisk,
+        todayDate: todayStr,
+        users: usersProgress,
+        dino: {
+          name: dinoName,
+          stage,
+          level: Math.max(1, Math.min(5, Math.floor(currentStreak / 7) + 1)),
+          mood,
+          title,
+        },
+        examCountdown: {
+          targetDate,
+          title: examTitle,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Duo streak error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to calculate duo streak' });
+  }
+});
+
+// Update Exam Countdown Target Date & Title
+progressRouter.put('/exam-countdown', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { targetDate, title } = req.body;
+    if (!targetDate) {
+      return res.status(400).json({ success: false, error: 'Target date is required' });
+    }
+
+    const db = getDb();
+
+    // Upsert target date
+    await db
+      .insert(appSettings)
+      .values({ key: 'exam_target_date', value: String(targetDate) })
+      .onConflictDoUpdate({
+        target: appSettings.key,
+        set: { value: String(targetDate), updatedAt: sql`(datetime('now'))` },
+      })
+      .run();
+
+    if (title && typeof title === 'string') {
+      await db
+        .insert(appSettings)
+        .values({ key: 'exam_title', value: title.trim() })
+        .onConflictDoUpdate({
+          target: appSettings.key,
+          set: { value: title.trim(), updatedAt: sql`(datetime('now'))` },
+        })
+        .run();
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        targetDate,
+        title: title || 'Electronics Technician (ECT) Licensure Examination',
+      },
+      message: 'Exam countdown target updated successfully',
+    });
+  } catch (error) {
+    console.error('Update exam countdown error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to update exam countdown' });
   }
 });

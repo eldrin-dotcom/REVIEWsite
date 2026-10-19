@@ -222,6 +222,45 @@ export interface RecentSession {
 }
 
 // ============================================
+// Duo Streak, Dino Pet & Countdown Types
+// ============================================
+
+export interface DuoUserProgress {
+  userId: number;
+  username: string;
+  displayName: string;
+  answeredToday: number;
+  targetToday: number;
+  completedToday: boolean;
+}
+
+export type DinoStage = 'egg' | 'baby' | 'study' | 'tech' | 'top_notcher';
+export type DinoMood = 'celebrating' | 'happy' | 'waiting' | 'sleepy';
+
+export interface DinoPetInfo {
+  name: string;
+  stage: DinoStage;
+  level: number;
+  mood: DinoMood;
+  title: string;
+}
+
+export interface ExamCountdownInfo {
+  targetDate: string;
+  title: string;
+}
+
+export interface DuoStreakData {
+  currentStreak: number;
+  completedToday: boolean;
+  atRisk: boolean;
+  todayDate: string;
+  users: DuoUserProgress[];
+  dino: DinoPetInfo;
+  examCountdown: ExamCountdownInfo;
+}
+
+// ============================================
 // API Response Wrapper
 // ============================================
 

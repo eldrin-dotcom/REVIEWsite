@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import MathRenderer from '../components/math/MathRenderer';
+import DoodleScratchpad from '../components/quiz/DoodleScratchpad';
+import FormulaSheetModal from '../components/quiz/FormulaSheetModal';
 import {
   BookOpen,
   Zap,
@@ -13,6 +15,8 @@ import {
   Calculator,
   AlertCircle,
   Trophy,
+  PenTool,
+  Star,
 } from 'lucide-react';
 import type { ExamTypeWithSubjects, QuizQuestion, QuizSession, QuestionTypeFilter } from 'shared';
 
@@ -45,6 +49,56 @@ export default function PracticePage() {
   const [quizFinished, setQuizFinished] = useState(false);
   const [startingQuiz, setStartingQuiz] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [showScratchpad, setShowScratchpad] = useState(false);
+  const [showFormulaSheet, setShowFormulaSheet] = useState(false);
+  const [bookmarkedIds, setBookmarkedIds] = useState<Set<number>>(new Set());
+
+  const location = useLocation();
+
+  // Check if routed directly from Mistake Vault
+  useEffect(() => {
+    if (location.state?.mistakeSession && location.state?.mistakeQuestions) {
+      setActiveSession(location.state.mistakeSession);
+      setQuestions(location.state.mistakeQuestions);
+      setCurrentIndex(0);
+      setSelectedChoice(null);
+      setAnswerResult(null);
+      setSessionScore(0);
+      setQuizFinished(false);
+    }
+  }, [location.state]);
+
+  // Load bookmarked question IDs
+  useEffect(() => {
+    fetch('/api/questions/bookmarked-ids', { credentials: 'include' })
+      .then((r) => r.json())
+      .then((j) => {
+        if (j.success && Array.isArray(j.data)) {
+          setBookmarkedIds(new Set(j.data));
+        }
+      })
+      .catch((err) => console.error('Failed to load bookmarks:', err));
+  }, []);
+
+  const handleToggleBookmark = async (qId: number) => {
+    try {
+      const res = await fetch(`/api/questions/${qId}/bookmark`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        setBookmarkedIds((prev) => {
+          const next = new Set(prev);
+          if (json.bookmarked) next.add(qId);
+          else next.delete(qId);
+          return next;
+        });
+      }
+    } catch (err) {
+      console.error('Bookmark toggle failed:', err);
+    }
+  };
 
   // Load questions hierarchy on mount
   useEffect(() => {
@@ -494,11 +548,35 @@ export default function PracticePage() {
           </span>
         </div>
 
-        {/* Live Score Counter */}
-        <div className="flex items-center gap-3">
-          <div className="text-right">
-            <span className="text-xs font-semibold text-text-secondary block">Score</span>
-            <span className="text-lg font-extrabold text-primary">
+        {/* Tools (Scratchpad & Formulas), Live Score Counter & Quit */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          <button
+            type="button"
+            onClick={() => setShowScratchpad((prev) => !prev)}
+            className={`py-1.5 px-2.5 rounded-xl border text-xs font-bold transition flex items-center gap-1.5 active:scale-95 ${
+              showScratchpad
+                ? 'bg-primary text-white border-primary shadow-xs'
+                : 'bg-bg-secondary hover:bg-card border-border text-text-primary'
+            }`}
+            title="Open doodle scratchpad for calculations"
+          >
+            <PenTool className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Scratchpad</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowFormulaSheet(true)}
+            className="py-1.5 px-2.5 rounded-xl border border-border bg-bg-secondary hover:bg-card text-text-primary text-xs font-bold transition flex items-center gap-1.5 active:scale-95"
+            title="View electronics formulas & resistor color codes"
+          >
+            <BookOpen className="w-3.5 h-3.5 text-primary" />
+            <span className="hidden sm:inline">Formulas</span>
+          </button>
+
+          <div className="text-right pl-1 border-l border-border">
+            <span className="text-[10px] font-semibold text-text-secondary block">Score</span>
+            <span className="text-base sm:text-lg font-extrabold text-primary">
               {sessionScore} <span className="text-xs font-normal text-text-secondary">correct</span>
             </span>
           </div>
@@ -527,8 +605,8 @@ export default function PracticePage() {
 
       {/* Question Card */}
       <div className="bg-card border border-border rounded-2xl p-6 sm:p-8 shadow-sm">
-        {/* Type Badge */}
-        <div className="mb-4 flex items-center gap-2">
+        {/* Type Badge & Star Bookmark */}
+        <div className="mb-4 flex items-center justify-between">
           <span
             className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
               currentQ.type === 'computation'
@@ -539,6 +617,20 @@ export default function PracticePage() {
             {currentQ.type === 'computation' ? <Calculator className="w-3 h-3" /> : <BookOpen className="w-3 h-3" />}
             {currentQ.type === 'computation' ? 'Computation' : 'Conceptual'}
           </span>
+
+          <button
+            type="button"
+            onClick={() => handleToggleBookmark(currentQ.id)}
+            className={`px-2.5 py-1 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition active:scale-95 ${
+              bookmarkedIds.has(currentQ.id)
+                ? 'bg-amber-500/15 border-amber-500/30 text-amber-500 font-bold'
+                : 'bg-bg-secondary border-border text-text-secondary hover:text-text-primary'
+            }`}
+            title={bookmarkedIds.has(currentQ.id) ? 'Starred question' : 'Star this question'}
+          >
+            <Star className={`w-3.5 h-3.5 ${bookmarkedIds.has(currentQ.id) ? 'fill-amber-500 text-amber-500' : ''}`} />
+            <span>{bookmarkedIds.has(currentQ.id) ? 'Starred' : 'Star'}</span>
+          </button>
         </div>
 
         {/* Question Text */}
@@ -646,6 +738,18 @@ export default function PracticePage() {
           </div>
         )}
       </div>
+
+      {/* Floating Interactive Computation Scratchpad */}
+      <DoodleScratchpad
+        isOpen={showScratchpad}
+        onClose={() => setShowScratchpad(false)}
+      />
+
+      {/* Electronics Quick Reference Formula Sheet Modal */}
+      <FormulaSheetModal
+        isOpen={showFormulaSheet}
+        onClose={() => setShowFormulaSheet(false)}
+      />
     </div>
   );
 }

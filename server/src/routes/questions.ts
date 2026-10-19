@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { eq, and, sql, inArray } from 'drizzle-orm';
 import { getDb } from '../db/index.js';
-import { examTypes, subjects, topics, questions, quizAnswers, quizSessions } from '../db/schema.js';
+import { examTypes, subjects, topics, questions, quizAnswers, quizSessions, bookmarkedQuestions } from '../db/schema.js';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth.js';
 import type { QuestionBankUpload } from 'shared';
 
@@ -316,5 +316,182 @@ questionsRouter.delete('/topic/:topicId', async (req: AuthenticatedRequest, res:
   } catch (error) {
     console.error('Delete topic error:', error);
     return res.status(500).json({ success: false, error: 'Failed to delete topic' });
+  }
+});
+
+// Get user's bookmarked question IDs (for fast star rendering in quiz)
+questionsRouter.get('/bookmarked-ids', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.userId!;
+    const db = getDb();
+    const rows = await db
+      .select({ questionId: bookmarkedQuestions.questionId })
+      .from(bookmarkedQuestions)
+      .where(eq(bookmarkedQuestions.userId, userId))
+      .all();
+
+    return res.json({ success: true, data: rows.map((r) => r.questionId) });
+  } catch (error) {
+    console.error('Get bookmarked IDs error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to fetch bookmarks' });
+  }
+});
+
+// Toggle bookmark for a question
+questionsRouter.post('/:questionId/bookmark', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.userId!;
+    const questionId = parseInt(req.params.questionId, 10);
+    const { notes } = req.body || {};
+
+    if (!questionId || isNaN(questionId)) {
+      return res.status(400).json({ success: false, error: 'Invalid question ID' });
+    }
+
+    const db = getDb();
+    const existing = await db
+      .select()
+      .from(bookmarkedQuestions)
+      .where(
+        and(
+          eq(bookmarkedQuestions.userId, userId),
+          eq(bookmarkedQuestions.questionId, questionId)
+        )
+      )
+      .get();
+
+    if (existing) {
+      // Remove bookmark
+      await db
+        .delete(bookmarkedQuestions)
+        .where(eq(bookmarkedQuestions.id, existing.id))
+        .run();
+
+      return res.json({ success: true, bookmarked: false, message: 'Question unstarred' });
+    } else {
+      // Add bookmark
+      await db
+        .insert(bookmarkedQuestions)
+        .values({
+          userId,
+          questionId,
+          notes: notes || null,
+        })
+        .run();
+
+      return res.json({ success: true, bookmarked: true, message: 'Question starred ⭐' });
+    }
+  } catch (error) {
+    console.error('Toggle bookmark error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to toggle bookmark' });
+  }
+});
+
+// Get all bookmarked questions with details
+questionsRouter.get('/bookmarks', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.userId!;
+    const db = getDb();
+
+    const bookmarks = await db
+      .select({
+        id: bookmarkedQuestions.id,
+        questionId: bookmarkedQuestions.questionId,
+        notes: bookmarkedQuestions.notes,
+        createdAt: bookmarkedQuestions.createdAt,
+        text: questions.text,
+        type: questions.type,
+        choices: questions.choices,
+        correctAnswer: questions.correctAnswer,
+        explanation: questions.explanation,
+      })
+      .from(bookmarkedQuestions)
+      .innerJoin(questions, eq(bookmarkedQuestions.questionId, questions.id))
+      .where(eq(bookmarkedQuestions.userId, userId))
+      .all();
+
+    const formatted = bookmarks.map((b) => ({
+      ...b,
+      choices: JSON.parse(b.choices),
+    }));
+
+    return res.json({ success: true, data: formatted });
+  } catch (error) {
+    console.error('Get bookmarks error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to fetch bookmarks' });
+  }
+});
+
+// Get user's Mistake Vault questions
+questionsRouter.get('/mistakes/vault', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.userId!;
+    const db = getDb();
+
+    // Query user's quiz answers ordered by id desc to determine latest status
+    const allUserAnswers = await db
+      .select({
+        questionId: quizAnswers.questionId,
+        isCorrect: quizAnswers.isCorrect,
+        answeredAt: quizAnswers.answeredAt,
+      })
+      .from(quizAnswers)
+      .innerJoin(quizSessions, eq(quizAnswers.sessionId, quizSessions.id))
+      .where(eq(quizSessions.userId, userId))
+      .all();
+
+    // Track total mistakes & latest result per question
+    const mistakeCounts = new Map<number, number>();
+    const latestStatus = new Map<number, boolean>();
+
+    for (const a of allUserAnswers) {
+      if (!a.isCorrect) {
+        mistakeCounts.set(a.questionId, (mistakeCounts.get(a.questionId) || 0) + 1);
+      }
+      // Latest status
+      latestStatus.set(a.questionId, !!a.isCorrect);
+    }
+
+    // Active mistakes: has at least one mistake AND latest answer was incorrect
+    const activeMistakeIds: number[] = [];
+    const clearedMistakeIds: number[] = [];
+
+    for (const [qId, count] of mistakeCounts.entries()) {
+      if (count > 0) {
+        if (!latestStatus.get(qId)) {
+          activeMistakeIds.push(qId);
+        } else {
+          clearedMistakeIds.push(qId);
+        }
+      }
+    }
+
+    let activeQuestions: any[] = [];
+    if (activeMistakeIds.length > 0) {
+      const qRows = await db
+        .select()
+        .from(questions)
+        .where(inArray(questions.id, activeMistakeIds))
+        .all();
+
+      activeQuestions = qRows.map((q) => ({
+        ...q,
+        choices: JSON.parse(q.choices),
+        timesMissed: mistakeCounts.get(q.id) || 1,
+      }));
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        activeCount: activeMistakeIds.length,
+        clearedCount: clearedMistakeIds.length,
+        totalEverMissed: mistakeCounts.size,
+        questions: activeQuestions,
+      },
+    });
+  } catch (error) {
+    console.error('Get mistake vault error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to fetch mistake vault' });
   }
 });

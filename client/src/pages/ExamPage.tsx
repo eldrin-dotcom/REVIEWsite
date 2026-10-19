@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import MathRenderer from '../components/math/MathRenderer';
+import DoodleScratchpad from '../components/quiz/DoodleScratchpad';
+import FormulaSheetModal from '../components/quiz/FormulaSheetModal';
 import {
   Timer,
   Zap,
@@ -10,6 +12,9 @@ import {
   ArrowLeft,
   ArrowRight,
   Clock,
+  PenTool,
+  BookOpen,
+  Star,
 } from 'lucide-react';
 import type { ExamTypeWithSubjects, QuizQuestion, QuizSession } from 'shared';
 
@@ -34,8 +39,43 @@ export default function ExamPage() {
   const [answers, setAnswers] = useState<Map<number, number>>(new Map());
   const [secondsRemaining, setSecondsRemaining] = useState<number>(0);
   const [submittingExam, setSubmittingExam] = useState(false);
+  const [showScratchpad, setShowScratchpad] = useState(false);
+  const [showFormulaSheet, setShowFormulaSheet] = useState(false);
+  const [bookmarkedIds, setBookmarkedIds] = useState<Set<number>>(new Set());
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Load bookmarked question IDs
+  useEffect(() => {
+    fetch('/api/questions/bookmarked-ids', { credentials: 'include' })
+      .then((r) => r.json())
+      .then((j) => {
+        if (j.success && Array.isArray(j.data)) {
+          setBookmarkedIds(new Set(j.data));
+        }
+      })
+      .catch((err) => console.error('Failed to load bookmarks:', err));
+  }, []);
+
+  const handleToggleBookmark = async (qId: number) => {
+    try {
+      const res = await fetch(`/api/questions/${qId}/bookmark`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        setBookmarkedIds((prev) => {
+          const next = new Set(prev);
+          if (json.bookmarked) next.add(qId);
+          else next.delete(qId);
+          return next;
+        });
+      }
+    } catch (err) {
+      console.error('Bookmark toggle failed:', err);
+    }
+  };
 
   // Load exam types
   useEffect(() => {
@@ -365,16 +405,40 @@ export default function ExamPage() {
           </span>
         </div>
 
-        {/* Timer Box & Action */}
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+        {/* Tools (Scratchpad & Formulas), Timer Box & Action */}
+        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+          <button
+            type="button"
+            onClick={() => setShowScratchpad((prev) => !prev)}
+            className={`py-1.5 sm:py-2 px-2 sm:px-3 rounded-xl border text-xs font-bold transition flex items-center gap-1.5 active:scale-95 ${
+              showScratchpad
+                ? 'bg-primary text-white border-primary shadow-xs'
+                : 'bg-bg-secondary hover:bg-card border-border text-text-primary'
+            }`}
+            title="Open doodle scratchpad for calculations"
+          >
+            <PenTool className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Scratchpad</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowFormulaSheet(true)}
+            className="py-1.5 sm:py-2 px-2 sm:px-3 rounded-xl border border-border bg-bg-secondary hover:bg-card text-text-primary text-xs font-bold transition flex items-center gap-1.5 active:scale-95"
+            title="View electronics formulas & resistor color codes"
+          >
+            <BookOpen className="w-3.5 h-3.5 text-primary" />
+            <span className="hidden sm:inline">Formulas</span>
+          </button>
+
           <div
-            className={`px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-xl border font-mono font-bold text-xs sm:text-lg flex items-center gap-1.5 sm:gap-2 transition ${
+            className={`px-2 sm:px-3.5 py-1.5 sm:py-2 rounded-xl border font-mono font-bold text-xs sm:text-base flex items-center gap-1 sm:gap-1.5 transition ${
               isTimeLow
                 ? 'bg-danger/15 border-danger text-danger animate-pulse'
                 : 'bg-bg-secondary border-border text-text-primary'
             }`}
           >
-            <Timer className={`w-3.5 h-3.5 sm:w-5 sm:h-5 ${isTimeLow ? 'text-danger' : 'text-primary'}`} />
+            <Timer className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${isTimeLow ? 'text-danger' : 'text-primary'}`} />
             <span>{formatTime(secondsRemaining)}</span>
           </div>
 
@@ -393,6 +457,27 @@ export default function ExamPage() {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
         {/* Main Question Card */}
         <div className="lg:col-span-3 bg-card border border-border rounded-2xl p-6 sm:p-8 shadow-xs">
+          {/* Question Meta & Star Bookmark */}
+          <div className="mb-4 flex items-center justify-between">
+            <span className="text-xs font-bold text-text-secondary uppercase tracking-wider">
+              Question {currentIndex + 1} of {questions.length}
+            </span>
+
+            <button
+              type="button"
+              onClick={() => handleToggleBookmark(currentQ.id)}
+              className={`px-2.5 py-1 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition active:scale-95 ${
+                bookmarkedIds.has(currentQ.id)
+                  ? 'bg-amber-500/15 border-amber-500/30 text-amber-500 font-bold'
+                  : 'bg-bg-secondary border-border text-text-secondary hover:text-text-primary'
+              }`}
+              title={bookmarkedIds.has(currentQ.id) ? 'Starred question' : 'Star this question'}
+            >
+              <Star className={`w-3.5 h-3.5 ${bookmarkedIds.has(currentQ.id) ? 'fill-amber-500 text-amber-500' : ''}`} />
+              <span>{bookmarkedIds.has(currentQ.id) ? 'Starred' : 'Star'}</span>
+            </button>
+          </div>
+
           <div className="text-base sm:text-lg font-medium text-text-primary leading-relaxed mb-6">
             <MathRenderer content={currentQ.text} />
           </div>
@@ -501,6 +586,18 @@ export default function ExamPage() {
           </div>
         </div>
       </div>
+
+      {/* Floating Interactive Computation Scratchpad */}
+      <DoodleScratchpad
+        isOpen={showScratchpad}
+        onClose={() => setShowScratchpad(false)}
+      />
+
+      {/* Electronics Quick Reference Formula Sheet Modal */}
+      <FormulaSheetModal
+        isOpen={showFormulaSheet}
+        onClose={() => setShowFormulaSheet(false)}
+      />
     </div>
   );
 }

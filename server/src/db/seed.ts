@@ -1,6 +1,6 @@
 import bcrypt from 'bcrypt';
 import { initDb, getDb, getClient } from './index.js';
-import { users, examTypes, subjects } from './schema.js';
+import { users, examTypes, subjects, appSettings } from './schema.js';
 import { eq } from 'drizzle-orm';
 
 const SALT_ROUNDS = 12;
@@ -77,11 +77,26 @@ export async function runSeed() {
       answered_at TEXT
     );
 
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY NOT NULL,
+      value TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS bookmarked_questions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      question_id INTEGER NOT NULL REFERENCES questions(id),
+      notes TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     -- Indexes
     CREATE INDEX IF NOT EXISTS idx_questions_topic ON questions(topic_id, type);
     CREATE INDEX IF NOT EXISTS idx_quiz_sessions_user ON quiz_sessions(user_id, completed);
     CREATE INDEX IF NOT EXISTS idx_quiz_answers_session ON quiz_answers(session_id);
     CREATE INDEX IF NOT EXISTS idx_quiz_answers_question ON quiz_answers(question_id);
+    CREATE INDEX IF NOT EXISTS idx_bookmarked_user ON bookmarked_questions(user_id, question_id);
   `);
 
   // Seed default users if none exist
@@ -132,6 +147,17 @@ export async function runSeed() {
     } else {
       console.log('  - Subjects already present, skipping subject seed');
     }
+  }
+
+  // Seed default app settings if none exist
+  const existingSettings = await db.select().from(appSettings).all();
+  if (existingSettings.length === 0) {
+    await db.insert(appSettings).values([
+      { key: 'exam_target_date', value: '2026-10-25T08:00:00' },
+      { key: 'exam_title', value: 'Electronics Technician (ECT) Licensure Examination' },
+      { key: 'dino_pet_name', value: 'Rexy' },
+    ]).run();
+    console.log('  ✓ Default app settings seeded (Exam countdown target date & Dino pet name)');
   }
 
   console.log('Seeding completed successfully!');

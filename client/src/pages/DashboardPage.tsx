@@ -27,7 +27,10 @@ import {
   Tooltip,
   CartesianGrid,
 } from 'recharts';
-import type { ProgressOverview, SubjectScore, ProgressHistory, RecentSession } from 'shared';
+import type { ProgressOverview, SubjectScore, ProgressHistory, RecentSession, DuoStreakData, ExamCountdownInfo } from 'shared';
+import DinoPetCard from '../components/dashboard/DinoPetCard';
+import ExamCountdownCard from '../components/dashboard/ExamCountdownCard';
+import MistakeVaultCard from '../components/dashboard/MistakeVaultCard';
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -35,16 +38,18 @@ export default function DashboardPage() {
   const [subjectScores, setSubjectScores] = useState<SubjectScore[]>([]);
   const [history, setHistory] = useState<ProgressHistory[]>([]);
   const [recentSessions, setRecentSessions] = useState<RecentSession[]>([]);
+  const [duoStreak, setDuoStreak] = useState<DuoStreakData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchDashboardData() {
       try {
-        const [ovRes, subRes, histRes, sessRes] = await Promise.all([
+        const [ovRes, subRes, histRes, sessRes, streakRes] = await Promise.all([
           fetch('/api/progress/overview', { credentials: 'include' }),
           fetch('/api/progress/subjects', { credentials: 'include' }),
           fetch('/api/progress/history', { credentials: 'include' }),
           fetch('/api/progress/sessions', { credentials: 'include' }),
+          fetch('/api/progress/duo-streak', { credentials: 'include' }),
         ]);
 
         if (ovRes.ok) {
@@ -63,6 +68,10 @@ export default function DashboardPage() {
           const json = await sessRes.json();
           if (json.success) setRecentSessions(json.data);
         }
+        if (streakRes.ok) {
+          const json = await streakRes.json();
+          if (json.success) setDuoStreak(json.data);
+        }
       } catch (err) {
         console.error('Failed to load dashboard data:', err);
       } finally {
@@ -72,6 +81,10 @@ export default function DashboardPage() {
 
     fetchDashboardData();
   }, []);
+
+  const handleUpdateCountdown = (newInfo: ExamCountdownInfo) => {
+    setDuoStreak((prev) => (prev ? { ...prev, examCountdown: newInfo } : null));
+  };
 
   return (
     <div className="space-y-6">
@@ -103,6 +116,22 @@ export default function DashboardPage() {
             <Timer className="w-4 h-4" /> Timed Exam
           </Link>
         </div>
+      </div>
+
+      {/* Duo Streak & Dino Pet Mascot Card */}
+      {duoStreak && (
+        <DinoPetCard streakData={duoStreak} currentUsername={user?.username} />
+      )}
+
+      {/* Official Exam Countdown & Mistake Vault Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        {duoStreak?.examCountdown && (
+          <ExamCountdownCard
+            countdownInfo={duoStreak.examCountdown}
+            onUpdateCountdown={handleUpdateCountdown}
+          />
+        )}
+        <MistakeVaultCard />
       </div>
 
       {/* Overview Stat Cards */}

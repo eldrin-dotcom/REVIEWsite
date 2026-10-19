@@ -106,6 +106,91 @@ quizRouter.post('/start', async (req: AuthenticatedRequest, res: Response) => {
   }
 });
 
+// Start a dedicated Mistake Vault session
+quizRouter.post('/start-mistakes', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.userId!;
+    const count = parseInt(req.body?.count, 10) || 10;
+    const db = getDb();
+
+    // 1. Fetch user's answers to determine current active mistakes
+    const allUserAnswers = await db
+      .select({
+        questionId: quizAnswers.questionId,
+        isCorrect: quizAnswers.isCorrect,
+      })
+      .from(quizAnswers)
+      .innerJoin(quizSessions, eq(quizAnswers.sessionId, quizSessions.id))
+      .where(eq(quizSessions.userId, userId))
+      .all();
+
+    const mistakeCounts = new Map<number, number>();
+    const latestStatus = new Map<number, boolean>();
+
+    for (const a of allUserAnswers) {
+      if (!a.isCorrect) {
+        mistakeCounts.set(a.questionId, (mistakeCounts.get(a.questionId) || 0) + 1);
+      }
+      latestStatus.set(a.questionId, !!a.isCorrect);
+    }
+
+    const activeMistakeIds: number[] = [];
+    for (const [qId, c] of mistakeCounts.entries()) {
+      if (c > 0 && !latestStatus.get(qId)) {
+        activeMistakeIds.push(qId);
+      }
+    }
+
+    if (activeMistakeIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Your Mistake Vault is completely clear! No active mistakes found. Great work! 🎉',
+      });
+    }
+
+    // Pick candidate questions
+    const shuffledIds = [...activeMistakeIds].sort(() => Math.random() - 0.5).slice(0, count);
+    const candidateQuestions = await db
+      .select()
+      .from(questions)
+      .where(inArray(questions.id, shuffledIds))
+      .all();
+
+    // Create session in practice mode
+    const session = await db
+      .insert(quizSessions)
+      .values({
+        userId,
+        mode: 'practice',
+        questionTypeFilter: 'mix',
+        totalQuestions: candidateQuestions.length,
+        correctAnswers: 0,
+        completed: false,
+      })
+      .returning()
+      .get();
+
+    const clientQuestions = candidateQuestions.map((q) => ({
+      id: q.id,
+      text: q.text,
+      type: q.type as 'conceptual' | 'computation',
+      choices: JSON.parse(q.choices) as string[],
+    }));
+
+    return res.json({
+      success: true,
+      data: {
+        session,
+        questions: clientQuestions,
+        serverStartTime: session.startedAt,
+      },
+    });
+  } catch (error) {
+    console.error('Start mistake drill error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to start mistake drill' });
+  }
+});
+
 // Submit a single answer in Practice Mode
 quizRouter.post('/:sessionId/answer', async (req: AuthenticatedRequest, res: Response) => {
   try {

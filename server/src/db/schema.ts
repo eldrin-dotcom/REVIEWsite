@@ -64,3 +64,17 @@ export const quizAnswers = sqliteTable('quiz_answers', {
   isCorrect: integer('is_correct', { mode: 'boolean' }),
   answeredAt: text('answered_at'),
 });
+
+export const appSettings = sqliteTable('app_settings', {
+  key: text('key').primaryKey(),
+  value: text('value').notNull(),
+  updatedAt: text('updated_at').default(sql`(datetime('now'))`).notNull(),
+});
+
+export const bookmarkedQuestions = sqliteTable('bookmarked_questions', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: integer('user_id').notNull().references(() => users.id),
+  questionId: integer('question_id').notNull().references(() => questions.id),
+  notes: text('notes'),
+  createdAt: text('created_at').default(sql`(datetime('now'))`).notNull(),
+});
