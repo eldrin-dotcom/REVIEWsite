@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { eq, and, sql, inArray } from 'drizzle-orm';
-import { getDb, getSqlite } from '../db/index.js';
+import { getDb } from '../db/index.js';
 import { examTypes, subjects, topics, questions, quizAnswers, quizSessions } from '../db/schema.js';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth.js';
 import type { QuestionBankUpload } from 'shared';
@@ -22,15 +22,15 @@ function inferQuestionType(q: { type?: string; text: string; choices: string[]; 
 }
 
 // Get all exam types with subjects and topics count
-questionsRouter.get('/hierarchy', (_req, res) => {
+questionsRouter.get('/hierarchy', async (_req, res) => {
   try {
     const db = getDb();
-    const allExamTypes = db.select().from(examTypes).all();
-    const allSubjects = db.select().from(subjects).all();
-    const allTopics = db.select().from(topics).all();
+    const allExamTypes = await db.select().from(examTypes).all();
+    const allSubjects = await db.select().from(subjects).all();
+    const allTopics = await db.select().from(topics).all();
 
     // Count questions per topic
-    const questionCounts = db
+    const questionCounts = await db
       .select({
         topicId: questions.topicId,
         count: sql<number>`count(*)`.as('count'),
@@ -87,10 +87,10 @@ questionsRouter.post('/upload', async (req: AuthenticatedRequest, res: Response)
     const db = getDb();
 
     // 1. Find or validate exam type
-    let targetExamType = db.select().from(examTypes).where(eq(examTypes.name, payload.examType.trim())).get();
+    let targetExamType = await db.select().from(examTypes).where(eq(examTypes.name, payload.examType.trim())).get();
     if (!targetExamType) {
       // Check case-insensitive
-      const all = db.select().from(examTypes).all();
+      const all = await db.select().from(examTypes).all();
       targetExamType = all.find(e => e.name.toLowerCase() === payload.examType.trim().toLowerCase());
       if (!targetExamType) {
         return res.status(400).json({
@@ -101,7 +101,7 @@ questionsRouter.post('/upload', async (req: AuthenticatedRequest, res: Response)
     }
 
     // 2. Find or validate subject under this exam type
-    const subjList = db.select().from(subjects).where(eq(subjects.examTypeId, targetExamType.id)).all();
+    const subjList = await db.select().from(subjects).where(eq(subjects.examTypeId, targetExamType.id)).all();
     let targetSubject = subjList.find(s => s.name.toLowerCase() === payload.subject.trim().toLowerCase());
     if (!targetSubject) {
       return res.status(400).json({
@@ -111,7 +111,7 @@ questionsRouter.post('/upload', async (req: AuthenticatedRequest, res: Response)
     }
 
     // 3. Find or auto-create topic
-    let targetTopic = db.select().from(topics).where(
+    let targetTopic = await db.select().from(topics).where(
       and(
         eq(topics.subjectId, targetSubject.id),
         eq(topics.name, payload.topic.trim())
@@ -120,7 +120,7 @@ questionsRouter.post('/upload', async (req: AuthenticatedRequest, res: Response)
 
     let topicCreated = false;
     if (!targetTopic) {
-      const insertResult = db.insert(topics).values({
+      const insertResult = await db.insert(topics).values({
         subjectId: targetSubject.id,
         name: payload.topic.trim(),
       }).returning().get();
@@ -129,7 +129,7 @@ questionsRouter.post('/upload', async (req: AuthenticatedRequest, res: Response)
     }
 
     // 4. Validate and insert questions
-    const existingQuestions = db.select().from(questions).where(eq(questions.topicId, targetTopic.id)).all();
+    const existingQuestions = await db.select().from(questions).where(eq(questions.topicId, targetTopic.id)).all();
     const existingTexts = new Set(existingQuestions.map(q => q.text.trim().toLowerCase()));
 
     let importedCount = 0;
@@ -169,14 +169,10 @@ questionsRouter.post('/upload', async (req: AuthenticatedRequest, res: Response)
     }
 
     if (toInsert.length > 0) {
-      const sqlite = getSqlite();
-      const insertTransaction = sqlite.transaction((items: typeof toInsert) => {
-        const chunkSize = 100;
-        for (let i = 0; i < items.length; i += chunkSize) {
-          db.insert(questions).values(items.slice(i, i + chunkSize)).run();
-        }
-      });
-      insertTransaction(toInsert);
+      const chunkSize = 100;
+      for (let i = 0; i < toInsert.length; i += chunkSize) {
+        await db.insert(questions).values(toInsert.slice(i, i + chunkSize)).run();
+      }
       importedCount = toInsert.length;
     }
 
@@ -226,7 +222,7 @@ questionsRouter.get('/sample', (_req, res) => {
 });
 
 // List questions by topic
-questionsRouter.get('/list', (req: AuthenticatedRequest, res: Response) => {
+questionsRouter.get('/list', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const topicId = parseInt(req.query.topicId as string, 10);
     if (!topicId || isNaN(topicId)) {
@@ -234,7 +230,7 @@ questionsRouter.get('/list', (req: AuthenticatedRequest, res: Response) => {
     }
 
     const db = getDb();
-    const qList = db.select().from(questions).where(eq(questions.topicId, topicId)).all();
+    const qList = await db.select().from(questions).where(eq(questions.topicId, topicId)).all();
 
     const formatted = qList.map(q => ({
       id: q.id,
@@ -255,7 +251,7 @@ questionsRouter.get('/list', (req: AuthenticatedRequest, res: Response) => {
 });
 
 // Delete a question (Admin / John only)
-questionsRouter.delete('/:id', (req: AuthenticatedRequest, res: Response) => {
+questionsRouter.delete('/:id', async (req: AuthenticatedRequest, res: Response) => {
   try {
     if (req.username !== 'john') {
       return res.status(403).json({ success: false, error: 'Access denied. Only John can delete questions.' });
@@ -269,12 +265,12 @@ questionsRouter.delete('/:id', (req: AuthenticatedRequest, res: Response) => {
     const db = getDb();
 
     // 1. Delete associated answers first
-    db.delete(quizAnswers).where(eq(quizAnswers.questionId, questionId)).run();
+    await db.delete(quizAnswers).where(eq(quizAnswers.questionId, questionId)).run();
 
     // 2. Delete question
-    const result = db.delete(questions).where(eq(questions.id, questionId)).run();
+    const result = await db.delete(questions).where(eq(questions.id, questionId)).run();
 
-    if (result.changes === 0) {
+    if (result.rowsAffected === 0) {
       return res.status(404).json({ success: false, error: 'Question not found' });
     }
 
@@ -286,7 +282,7 @@ questionsRouter.delete('/:id', (req: AuthenticatedRequest, res: Response) => {
 });
 
 // Delete an entire topic and its questions (Admin / John only)
-questionsRouter.delete('/topic/:topicId', (req: AuthenticatedRequest, res: Response) => {
+questionsRouter.delete('/topic/:topicId', async (req: AuthenticatedRequest, res: Response) => {
   try {
     if (req.username !== 'john') {
       return res.status(403).json({ success: false, error: 'Access denied. Only John can delete topics.' });
@@ -300,21 +296,21 @@ questionsRouter.delete('/topic/:topicId', (req: AuthenticatedRequest, res: Respo
     const db = getDb();
 
     // 1. Find all question IDs for this topic
-    const topicQuestions = db.select({ id: questions.id }).from(questions).where(eq(questions.topicId, topicId)).all();
+    const topicQuestions = await db.select({ id: questions.id }).from(questions).where(eq(questions.topicId, topicId)).all();
     const qIds = topicQuestions.map(q => q.id);
 
     if (qIds.length > 0) {
       // Delete answers
-      db.delete(quizAnswers).where(inArray(quizAnswers.questionId, qIds)).run();
+      await db.delete(quizAnswers).where(inArray(quizAnswers.questionId, qIds)).run();
       // Delete questions
-      db.delete(questions).where(eq(questions.topicId, topicId)).run();
+      await db.delete(questions).where(eq(questions.topicId, topicId)).run();
     }
 
     // Unlink any quiz sessions referencing this topic to prevent foreign key errors
-    db.update(quizSessions).set({ topicId: null }).where(eq(quizSessions.topicId, topicId)).run();
+    await db.update(quizSessions).set({ topicId: null }).where(eq(quizSessions.topicId, topicId)).run();
 
     // Delete topic
-    db.delete(topics).where(eq(topics.id, topicId)).run();
+    await db.delete(topics).where(eq(topics.id, topicId)).run();
 
     return res.json({ success: true, message: `Topic and ${qIds.length} question(s) deleted successfully` });
   } catch (error) {
@@ -322,4 +318,3 @@ questionsRouter.delete('/topic/:topicId', (req: AuthenticatedRequest, res: Respo
     return res.status(500).json({ success: false, error: 'Failed to delete topic' });
   }
 });
-

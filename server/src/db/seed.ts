@@ -1,5 +1,5 @@
 import bcrypt from 'bcrypt';
-import { initDb, getDb, getSqlite } from './index.js';
+import { initDb, getDb, getClient } from './index.js';
 import { users, examTypes, subjects } from './schema.js';
 import { eq } from 'drizzle-orm';
 
@@ -9,10 +9,10 @@ export async function runSeed() {
   console.log('Seeding database...');
   initDb();
   const db = getDb();
-  const sqlite = getSqlite();
+  const client = getClient();
 
   // Create tables if they don't exist
-  sqlite.exec(`
+  await client.executeMultiple(`
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       username TEXT UNIQUE NOT NULL,
@@ -85,10 +85,10 @@ export async function runSeed() {
   `);
 
   // Seed default users if none exist
-  const existingUsers = db.select().from(users).all();
+  const existingUsers = await db.select().from(users).all();
   if (existingUsers.length === 0) {
     const passwordHash = await bcrypt.hash('changeme123', SALT_ROUNDS);
-    db.insert(users).values([
+    await db.insert(users).values([
       { username: 'john', passwordHash, displayName: 'John', theme: 'dark' },
       { username: 'emma', passwordHash, displayName: 'Hon', theme: 'pink' },
     ]).run();
@@ -98,9 +98,9 @@ export async function runSeed() {
   }
 
   // Seed exam types if none exist
-  const existingExamTypes = db.select().from(examTypes).all();
+  const existingExamTypes = await db.select().from(examTypes).all();
   if (existingExamTypes.length === 0) {
-    db.insert(examTypes).values([
+    await db.insert(examTypes).values([
       { name: 'Pre-board', description: 'Pre-board Examination (MATH, GEAS, ELECTRONICS, ESAT)' },
       { name: 'ECT', description: 'Electronics Technician Licensure Examination (Basic Math, ELECTRONICS, ESAT, ECE Laws)' },
     ]).run();
@@ -110,13 +110,13 @@ export async function runSeed() {
   }
 
   // Fetch exam types for subject mapping
-  const preBoard = db.select().from(examTypes).where(eq(examTypes.name, 'Pre-board')).get();
-  const ect = db.select().from(examTypes).where(eq(examTypes.name, 'ECT')).get();
+  const preBoard = await db.select().from(examTypes).where(eq(examTypes.name, 'Pre-board')).get();
+  const ect = await db.select().from(examTypes).where(eq(examTypes.name, 'ECT')).get();
 
   if (preBoard && ect) {
-    const existingSubjects = db.select().from(subjects).all();
+    const existingSubjects = await db.select().from(subjects).all();
     if (existingSubjects.length === 0) {
-      db.insert(subjects).values([
+      await db.insert(subjects).values([
         // Pre-board subjects
         { examTypeId: preBoard.id, name: 'MATH' },
         { examTypeId: preBoard.id, name: 'GEAS' },

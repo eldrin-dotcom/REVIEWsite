@@ -29,8 +29,7 @@ quizRouter.post('/start', async (req: AuthenticatedRequest, res: Response) => {
         return res.status(400).json({ success: false, error: 'Topic is required for practice mode' });
       }
 
-      let query = db.select().from(questions).where(eq(questions.topicId, topicId));
-      let allForTopic = query.all();
+      let allForTopic = await db.select().from(questions).where(eq(questions.topicId, topicId)).all();
 
       if (questionType && questionType !== 'mix') {
         allForTopic = allForTopic.filter(q => q.type === questionType);
@@ -43,15 +42,15 @@ quizRouter.post('/start', async (req: AuthenticatedRequest, res: Response) => {
         return res.status(400).json({ success: false, error: 'Exam type is required for exam mode' });
       }
 
-      const examSubjects = db.select().from(subjects).where(eq(subjects.examTypeId, examTypeId)).all();
+      const examSubjects = await db.select().from(subjects).where(eq(subjects.examTypeId, examTypeId)).all();
       const subjectIds = examSubjects.map(s => s.id);
 
       if (subjectIds.length > 0) {
-        const examTopics = db.select().from(topics).where(inArray(topics.subjectId, subjectIds)).all();
+        const examTopics = await db.select().from(topics).where(inArray(topics.subjectId, subjectIds)).all();
         const topicIds = examTopics.map(t => t.id);
 
         if (topicIds.length > 0) {
-          candidateQuestions = db.select().from(questions).where(inArray(questions.topicId, topicIds)).all();
+          candidateQuestions = await db.select().from(questions).where(inArray(questions.topicId, topicIds)).all();
         }
       }
     }
@@ -68,7 +67,7 @@ quizRouter.post('/start', async (req: AuthenticatedRequest, res: Response) => {
     const selected = shuffled.slice(0, Math.min(count || 20, shuffled.length));
 
     // Create session
-    const session = db
+    const session = await db
       .insert(quizSessions)
       .values({
         userId,
@@ -117,7 +116,7 @@ quizRouter.post('/:sessionId/answer', async (req: AuthenticatedRequest, res: Res
     const db = getDb();
 
     // Verify session
-    const session = db.select().from(quizSessions).where(
+    const session = await db.select().from(quizSessions).where(
       and(
         eq(quizSessions.id, sessionId),
         eq(quizSessions.userId, userId)
@@ -128,7 +127,7 @@ quizRouter.post('/:sessionId/answer', async (req: AuthenticatedRequest, res: Res
       return res.status(404).json({ success: false, error: 'Quiz session not found' });
     }
 
-    const question = db.select().from(questions).where(eq(questions.id, questionId)).get();
+    const question = await db.select().from(questions).where(eq(questions.id, questionId)).get();
     if (!question) {
       return res.status(404).json({ success: false, error: 'Question not found' });
     }
@@ -136,7 +135,7 @@ quizRouter.post('/:sessionId/answer', async (req: AuthenticatedRequest, res: Res
     const isCorrect = question.correctAnswer === selectedAnswer;
 
     // Record answer
-    db.insert(quizAnswers).values({
+    await db.insert(quizAnswers).values({
       sessionId,
       questionId,
       selectedAnswer,
@@ -146,7 +145,7 @@ quizRouter.post('/:sessionId/answer', async (req: AuthenticatedRequest, res: Res
 
     // Increment session score if correct
     if (isCorrect) {
-      db.update(quizSessions)
+      await db.update(quizSessions)
         .set({ correctAnswers: sql`${quizSessions.correctAnswers} + 1` })
         .where(eq(quizSessions.id, sessionId))
         .run();
@@ -175,7 +174,7 @@ quizRouter.post('/:sessionId/submit', async (req: AuthenticatedRequest, res: Res
 
     const db = getDb();
 
-    const session = db.select().from(quizSessions).where(
+    const session = await db.select().from(quizSessions).where(
       and(
         eq(quizSessions.id, sessionId),
         eq(quizSessions.userId, userId)
@@ -195,7 +194,7 @@ quizRouter.post('/:sessionId/submit', async (req: AuthenticatedRequest, res: Res
     // If answers provided (exam mode batch submit)
     if (Array.isArray(answers) && answers.length > 0) {
       const qIds = answers.map(a => a.questionId);
-      const questionRecords = db.select().from(questions).where(inArray(questions.id, qIds)).all();
+      const questionRecords = await db.select().from(questions).where(inArray(questions.id, qIds)).all();
       const qMap = new Map(questionRecords.map(q => [q.id, q]));
 
       for (const ans of answers) {
@@ -203,7 +202,7 @@ quizRouter.post('/:sessionId/submit', async (req: AuthenticatedRequest, res: Res
         const isCorrect = q ? q.correctAnswer === ans.selectedAnswer : false;
         if (isCorrect) correctCount++;
 
-        db.insert(quizAnswers).values({
+        await db.insert(quizAnswers).values({
           sessionId,
           questionId: ans.questionId,
           selectedAnswer: ans.selectedAnswer,
@@ -213,7 +212,7 @@ quizRouter.post('/:sessionId/submit', async (req: AuthenticatedRequest, res: Res
       }
     } else {
       // In practice mode, correctAnswers was already incremented incrementally
-      const recorded = db.select().from(quizAnswers).where(eq(quizAnswers.sessionId, sessionId)).all();
+      const recorded = await db.select().from(quizAnswers).where(eq(quizAnswers.sessionId, sessionId)).all();
       correctCount = recorded.filter(r => r.isCorrect).length;
     }
 
@@ -223,7 +222,7 @@ quizRouter.post('/:sessionId/submit', async (req: AuthenticatedRequest, res: Res
     const timeSpentSeconds = Math.max(0, Math.floor((now.getTime() - startTime.getTime()) / 1000));
 
     // Update session as completed
-    const updated = db.update(quizSessions).set({
+    const updated = await db.update(quizSessions).set({
       completed: true,
       correctAnswers: correctCount,
       timeSpentSeconds,
@@ -253,7 +252,7 @@ quizRouter.get('/:sessionId/review', async (req: AuthenticatedRequest, res: Resp
 
     const db = getDb();
 
-    const session = db.select().from(quizSessions).where(
+    const session = await db.select().from(quizSessions).where(
       and(
         eq(quizSessions.id, sessionId),
         eq(quizSessions.userId, userId)
@@ -264,11 +263,11 @@ quizRouter.get('/:sessionId/review', async (req: AuthenticatedRequest, res: Resp
       return res.status(404).json({ success: false, error: 'Quiz session not found' });
     }
 
-    const answers = db.select().from(quizAnswers).where(eq(quizAnswers.sessionId, sessionId)).all();
+    const answers = await db.select().from(quizAnswers).where(eq(quizAnswers.sessionId, sessionId)).all();
     const qIds = answers.map(a => a.questionId);
 
     const questionList = qIds.length > 0
-      ? db.select().from(questions).where(inArray(questions.id, qIds)).all()
+      ? await db.select().from(questions).where(inArray(questions.id, qIds)).all()
       : [];
     const qMap = new Map(questionList.map(q => [q.id, q]));
 

@@ -26,7 +26,7 @@ authRouter.post('/login', async (req, res) => {
     }
 
     const db = getDb();
-    const user = db.select().from(users).where(eq(users.username, username.trim().toLowerCase())).get();
+    const user = await db.select().from(users).where(eq(users.username, username.trim().toLowerCase())).get();
 
     if (!user) {
       return res.status(401).json({ success: false, error: 'Invalid username or password' });
@@ -66,10 +66,10 @@ authRouter.post('/logout', (_req, res) => {
 });
 
 // Current User
-authRouter.get('/me', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+authRouter.get('/me', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const db = getDb();
-    const user = db.select().from(users).where(eq(users.id, req.userId!)).get();
+    const user = await db.select().from(users).where(eq(users.id, req.userId!)).get();
 
     if (!user) {
       return res.status(404).json({ success: false, error: 'User not found' });
@@ -91,7 +91,7 @@ authRouter.get('/me', requireAuth, (req: AuthenticatedRequest, res: Response) =>
 });
 
 // Update Theme
-authRouter.put('/theme', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+authRouter.put('/theme', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { theme } = req.body;
     const validThemes = ['light', 'dark', 'pink'];
@@ -101,7 +101,7 @@ authRouter.put('/theme', requireAuth, (req: AuthenticatedRequest, res: Response)
     }
 
     const db = getDb();
-    db.update(users).set({ theme }).where(eq(users.id, req.userId!)).run();
+    await db.update(users).set({ theme }).where(eq(users.id, req.userId!)).run();
 
     return res.json({ success: true, data: { theme } });
   } catch (error) {
@@ -124,7 +124,7 @@ authRouter.put('/password', requireAuth, async (req: AuthenticatedRequest, res: 
     }
 
     const db = getDb();
-    const user = db.select().from(users).where(eq(users.id, req.userId!)).get();
+    const user = await db.select().from(users).where(eq(users.id, req.userId!)).get();
 
     if (!user) {
       return res.status(404).json({ success: false, error: 'User not found' });
@@ -136,7 +136,7 @@ authRouter.put('/password', requireAuth, async (req: AuthenticatedRequest, res: 
     }
 
     const newHash = await bcrypt.hash(newPassword, 10);
-    db.update(users).set({ passwordHash: newHash }).where(eq(users.id, user.id)).run();
+    await db.update(users).set({ passwordHash: newHash }).where(eq(users.id, user.id)).run();
 
     return res.json({ success: true, message: 'Password updated successfully' });
   } catch (error) {
