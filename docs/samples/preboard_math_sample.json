@@ -1,0 +1,43 @@
+{
+  "examType": "Pre-board",
+  "subject": "MATH",
+  "topic": "Algebra and Progression",
+  "questions": [
+    {
+      "text": "What is the sum of the first 20 terms of the arithmetic progression $3, 7, 11, 15, \\dots$?",
+      "type": "computation",
+      "choices": [
+        "820",
+        "780",
+        "860",
+        "900"
+      ],
+      "answer": 0,
+      "explanation": "Here first term $a_1 = 3$, common difference $d = 4$, and $n = 20$. Using the AP sum formula: $$S_n = \\frac{n}{2} [2a_1 + (n - 1)d]$$ $$S_{20} = \\frac{20}{2} [2(3) + (19)(4)] = 10 [6 + 76] = 10(82) = 820$$"
+    },
+    {
+      "text": "A polynomial equation of degree $n$ with complex coefficients has exactly $n$ complex roots (counting multiplicities). This is known as which theorem?",
+      "type": "conceptual",
+      "choices": [
+        "Remainder Theorem",
+        "Rational Root Theorem",
+        "Fundamental Theorem of Algebra",
+        "Binomial Theorem"
+      ],
+      "answer": 2,
+      "explanation": "The Fundamental Theorem of Algebra states that every non-constant single-variable polynomial with complex coefficients has at least one complex root, which implies an $n$-th degree polynomial has exactly $n$ roots counting multiplicity."
+    },
+    {
+      "text": "Evaluate the infinite geometric series: $S = 18 + 6 + 2 + \\frac{2}{3} + \\dots$",
+      "type": "computation",
+      "choices": [
+        "24",
+        "27",
+        "36",
+        "54"
+      ],
+      "answer": 1,
+      "explanation": "First term $a = 18$ and common ratio $r = \\frac{6}{18} = \\frac{1}{3}$. Since $|r| < 1$, the sum is: $$S = \\frac{a}{1 - r} = \\frac{18}{1 - \\frac{1}{3}} = \\frac{18}{\\frac{2}{3}} = 18 \\times \\frac{3}{2} = 27$$"
+    }
+  ]
+}

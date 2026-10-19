@@ -1,0 +1,67 @@
+{
+  "examType": "ECT",
+  "subject": "ELECTRONICS",
+  "topic": "Semiconductors and Diodes",
+  "questions": [
+    {
+      "text": "What is the typical forward barrier potential of a Silicon (Si) PN junction diode at $25^\\circ\\text{C}$?",
+      "type": "conceptual",
+      "choices": [
+        "0.3 V",
+        "0.7 V",
+        "1.1 V",
+        "2.0 V"
+      ],
+      "answer": 1,
+      "explanation": "Silicon PN diodes have a nominal forward barrier potential of approximately $0.7\\,\\text{V}$. Germanium (Ge) diodes exhibit approximately $0.3\\,\\text{V}$."
+    },
+    {
+      "text": "A silicon diode is connected in series with a $1\\,\\text{k}\\Omega$ resistor and a $10\\,\\text{V}$ DC voltage source. Assuming a forward voltage drop of $0.7\\,\\text{V}$, calculate the circuit current $I$.",
+      "type": "computation",
+      "choices": [
+        "9.3 mA",
+        "10.0 mA",
+        "0.7 mA",
+        "14.3 mA"
+      ],
+      "answer": 0,
+      "explanation": "By Kirchhoff's Voltage Law: $$V_S - V_D - I R = 0$$ $$10\\,\\text{V} - 0.7\\,\\text{V} = I(1000\\,\\Omega)$$ $$I = \\frac{9.3\\,\\text{V}}{1000\\,\\Omega} = 9.3\\,\\text{mA}$$"
+    },
+    {
+      "text": "Which semiconductor majority carrier type is responsible for electric current conduction in an N-type semiconductor material?",
+      "type": "conceptual",
+      "choices": [
+        "Holes",
+        "Free electrons",
+        "Positive ions",
+        "Neutrons"
+      ],
+      "answer": 1,
+      "explanation": "N-type semiconductor is doped with pentavalent donor impurities (such as Phosphorus, Arsenic, or Antimony), which provide an excess of free conduction band electrons as majority carriers."
+    },
+    {
+      "text": "A full-wave center-tapped rectifier circuit has a transformer secondary voltage of $24\\,\\text{V}_{\\text{rms}}$ from the center tap to either end. Neglecting diode drop, what is the Peak Inverse Voltage (PIV) rating required for each diode?",
+      "type": "computation",
+      "choices": [
+        "33.9 V",
+        "67.9 V",
+        "24.0 V",
+        "48.0 V"
+      ],
+      "answer": 1,
+      "explanation": "For a center-tapped full-wave rectifier: $$V_m = 24 \\times \\sqrt{2} \\approx 33.94\\,\\text{V}$$ The Peak Inverse Voltage (PIV) across the non-conducting diode is: $$\\text{PIV} = 2 V_m = 2(33.94\\,\\text{V}) \\approx 67.9\\,\\text{V}$$"
+    },
+    {
+      "text": "In a Zener diode operating in its breakdown region, what happens to the voltage across the diode as the reverse current increases?",
+      "type": "conceptual",
+      "choices": [
+        "It increases linearly with current",
+        "It decreases to zero",
+        "It remains essentially constant at $V_Z$",
+        "It oscillates at high frequency"
+      ],
+      "answer": 2,
+      "explanation": "In the avalanche/Zener breakdown region, a Zener diode maintains an essentially constant voltage $V_Z$ across its terminals over a wide variation of reverse breakdown current, making it ideal for voltage regulation."
+    }
+  ]
+}

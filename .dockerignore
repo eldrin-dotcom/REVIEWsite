@@ -1,0 +1,13 @@
+node_modules
+client/node_modules
+server/node_modules
+shared/node_modules
+client/dist
+server/dist
+.git
+.github
+.gemini
+*.log
+.env
+.env.local
+server/data/*.db*
