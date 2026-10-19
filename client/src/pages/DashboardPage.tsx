@@ -261,10 +261,10 @@ export default function DashboardPage() {
       </div>
 
       {/* Recent Sessions List */}
-      <div className="bg-card border border-border rounded-2xl p-6 shadow-xs">
+      <div className="bg-card border border-border rounded-2xl p-4 sm:p-6 shadow-xs">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-lg font-bold text-text-primary">Recent Quiz Sessions</h2>
+            <h2 className="text-base sm:text-lg font-bold text-text-primary">Recent Quiz Sessions</h2>
             <p className="text-xs text-text-secondary">Your latest practice and mock exam runs</p>
           </div>
           <Link to="/practice" className="text-xs text-primary font-semibold hover:underline flex items-center gap-1">
@@ -273,73 +273,150 @@ export default function DashboardPage() {
         </div>
 
         {recentSessions.length > 0 ? (
-          <div className="overflow-x-auto -mx-6 px-6">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-border text-text-secondary text-xs uppercase tracking-wider">
-                  <th className="pb-3 font-semibold">Mode</th>
-                  <th className="pb-3 font-semibold">Context / Subject</th>
-                  <th className="pb-3 font-semibold">Score</th>
-                  <th className="pb-3 font-semibold">Accuracy</th>
-                  <th className="pb-3 font-semibold">Time</th>
-                  <th className="pb-3 font-semibold text-right">Review</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {recentSessions.map((s) => (
-                  <tr key={s.id} className="hover:bg-bg-secondary/50 transition">
-                    <td className="py-3 font-medium text-text-primary">
+          <>
+            {/* Mobile Card View (shown below md screen) */}
+            <div className="md:hidden space-y-3">
+              {recentSessions.map((s) => {
+                const isExam = s.mode === 'exam';
+                const accuracyColor =
+                  s.accuracy >= 90
+                    ? 'text-success bg-success/10 border-success/20'
+                    : s.accuracy >= 70
+                    ? 'text-primary bg-primary/10 border-primary/20'
+                    : 'text-danger bg-danger/10 border-danger/20';
+
+                return (
+                  <div
+                    key={s.id}
+                    className="p-3.5 rounded-xl border border-border bg-bg-secondary/40 space-y-2.5 transition active:scale-[0.99]"
+                  >
+                    {/* Top row: Mode badge + Date */}
+                    <div className="flex items-center justify-between">
                       <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                          s.mode === 'exam'
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                          isExam
                             ? 'bg-danger/10 text-danger border border-danger/20'
                             : 'bg-primary/10 text-primary border border-primary/20'
                         }`}
                       >
-                        {s.mode === 'exam' ? <Timer className="w-3 h-3" /> : <BookOpen className="w-3 h-3" />}
-                        {s.mode === 'exam' ? 'Exam' : 'Practice'}
+                        {isExam ? <Timer className="w-3 h-3" /> : <BookOpen className="w-3 h-3" />}
+                        {isExam ? 'Timed Exam' : 'Practice Drill'}
                       </span>
-                    </td>
-                    <td className="py-3 text-text-primary">
-                      <div>
-                        <span className="font-semibold">{s.subjectName || s.examTypeName}</span>
-                        {s.topicName && (
-                          <span className="block text-xs text-text-secondary">{s.topicName}</span>
-                        )}
+
+                      <span className="text-[11px] text-text-secondary font-medium">
+                        {s.completedAt ? new Date(s.completedAt).toLocaleDateString() : 'Recent'}
+                      </span>
+                    </div>
+
+                    {/* Subject & Topic */}
+                    <div>
+                      <h4 className="font-bold text-text-primary text-sm leading-snug">
+                        {s.subjectName || s.examTypeName}
+                      </h4>
+                      {s.topicName && (
+                        <p className="text-xs text-text-secondary truncate mt-0.5">
+                          {s.topicName}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Stats & Review Button */}
+                    <div className="flex items-center justify-between pt-2 border-t border-border/70">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-text-primary">
+                          {s.score}/{s.totalQuestions}
+                        </span>
+                        <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${accuracyColor}`}>
+                          {s.accuracy}%
+                        </span>
+                        {s.timeSpentSeconds ? (
+                          <span className="text-[11px] text-text-secondary">
+                            · {Math.floor(s.timeSpentSeconds / 60)}m {s.timeSpentSeconds % 60}s
+                          </span>
+                        ) : null}
                       </div>
-                    </td>
-                    <td className="py-3 font-semibold text-text-primary">
-                      {s.score} / {s.totalQuestions}
-                    </td>
-                    <td className="py-3 font-bold">
-                      <span
-                        className={
-                          s.accuracy >= 90
-                            ? 'text-success'
-                            : s.accuracy >= 70
-                            ? 'text-primary'
-                            : 'text-danger'
-                        }
-                      >
-                        {s.accuracy}%
-                      </span>
-                    </td>
-                    <td className="py-3 text-xs text-text-secondary">
-                      {s.timeSpentSeconds ? `${Math.floor(s.timeSpentSeconds / 60)}m ${s.timeSpentSeconds % 60}s` : 'Untimed'}
-                    </td>
-                    <td className="py-3 text-right">
+
                       <Link
                         to={`/review/${s.id}`}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 transition"
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-primary hover:bg-primary-hover active:scale-95 transition shadow-xs"
                       >
                         Review <ArrowRight className="w-3 h-3" />
                       </Link>
-                    </td>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Desktop Table View (shown md and above) */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-border text-text-secondary text-xs uppercase tracking-wider">
+                    <th className="pb-3 font-semibold">Mode</th>
+                    <th className="pb-3 font-semibold">Context / Subject</th>
+                    <th className="pb-3 font-semibold">Score</th>
+                    <th className="pb-3 font-semibold">Accuracy</th>
+                    <th className="pb-3 font-semibold">Time</th>
+                    <th className="pb-3 font-semibold text-right">Review</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {recentSessions.map((s) => (
+                    <tr key={s.id} className="hover:bg-bg-secondary/50 transition">
+                      <td className="py-3 font-medium text-text-primary">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                            s.mode === 'exam'
+                              ? 'bg-danger/10 text-danger border border-danger/20'
+                              : 'bg-primary/10 text-primary border border-primary/20'
+                          }`}
+                        >
+                          {s.mode === 'exam' ? <Timer className="w-3 h-3" /> : <BookOpen className="w-3 h-3" />}
+                          {s.mode === 'exam' ? 'Exam' : 'Practice'}
+                        </span>
+                      </td>
+                      <td className="py-3 text-text-primary">
+                        <div>
+                          <span className="font-semibold">{s.subjectName || s.examTypeName}</span>
+                          {s.topicName && (
+                            <span className="block text-xs text-text-secondary">{s.topicName}</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-3 font-semibold text-text-primary">
+                        {s.score} / {s.totalQuestions}
+                      </td>
+                      <td className="py-3 font-bold">
+                        <span
+                          className={
+                            s.accuracy >= 90
+                              ? 'text-success'
+                              : s.accuracy >= 70
+                              ? 'text-primary'
+                              : 'text-danger'
+                          }
+                        >
+                          {s.accuracy}%
+                        </span>
+                      </td>
+                      <td className="py-3 text-xs text-text-secondary">
+                        {s.timeSpentSeconds ? `${Math.floor(s.timeSpentSeconds / 60)}m ${s.timeSpentSeconds % 60}s` : 'Untimed'}
+                      </td>
+                      <td className="py-3 text-right">
+                        <Link
+                          to={`/review/${s.id}`}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 transition"
+                        >
+                          Review <ArrowRight className="w-3 h-3" />
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         ) : (
           <div className="text-center py-8 text-text-secondary text-sm">
             No quiz sessions yet. Start your first practice session!

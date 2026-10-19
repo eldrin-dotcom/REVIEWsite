@@ -72,32 +72,34 @@ export default function ReviewPage() {
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       {/* Review Header Banner */}
-      <div className="bg-card border border-border rounded-2xl p-6 sm:p-8 shadow-xs">
+      <div className="bg-card border border-border rounded-2xl p-4 sm:p-8 shadow-xs">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary border border-primary/20 mb-2">
               <ClipboardCheck className="w-3.5 h-3.5" /> Quiz Review & Solutions
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-text-primary tracking-tight">
+            <h1 className="text-xl sm:text-3xl font-extrabold text-text-primary tracking-tight">
               Session Performance
             </h1>
-            <p className="text-text-secondary text-xs sm:text-sm mt-1 flex items-center gap-1.5">
-              {session.mode === 'exam' ? <Timer className="w-3.5 h-3.5 text-danger" /> : <BookOpen className="w-3.5 h-3.5 text-primary" />}
+            <p className="text-text-secondary text-xs sm:text-sm mt-1 flex flex-wrap items-center gap-1.5">
+              {session.mode === 'exam' ? <Timer className="w-3.5 h-3.5 text-danger shrink-0" /> : <BookOpen className="w-3.5 h-3.5 text-primary shrink-0" />}
               <span>{session.mode === 'exam' ? 'Timed Mock Exam' : 'Practice Drill'}</span>
-              <span>· Completed on {session.completedAt ? new Date(session.completedAt).toLocaleString() : 'N/A'}</span>
+              <span>· {session.completedAt ? new Date(session.completedAt).toLocaleDateString() : 'Recent'}</span>
             </p>
           </div>
 
-          <div className="text-right bg-bg-secondary p-4 rounded-xl border border-border min-w-[130px]">
-            <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider block">
-              Score
-            </span>
-            <span className="text-2xl sm:text-3xl font-extrabold text-primary block">
-              {session.correctAnswers} / {session.totalQuestions}
-            </span>
+          <div className="w-full sm:w-auto flex sm:flex-col justify-between sm:justify-center items-center sm:items-end bg-bg-secondary p-3.5 sm:p-4 rounded-xl border border-border min-w-[130px]">
+            <div>
+              <span className="text-[11px] sm:text-xs font-semibold text-text-secondary uppercase tracking-wider block text-left sm:text-right">
+                Score
+              </span>
+              <span className="text-xl sm:text-3xl font-extrabold text-primary block text-left sm:text-right">
+                {session.correctAnswers} / {session.totalQuestions}
+              </span>
+            </div>
             <span
-              className={`text-xs font-bold ${
-                accuracy >= 90 ? 'text-success' : accuracy >= 70 ? 'text-primary' : 'text-danger'
+              className={`text-xs font-bold px-2 py-0.5 rounded-full border sm:border-0 ${
+                accuracy >= 90 ? 'text-success bg-success/10 sm:bg-transparent border-success/30' : accuracy >= 70 ? 'text-primary bg-primary/10 sm:bg-transparent border-primary/30' : 'text-danger bg-danger/10 sm:bg-transparent border-danger/30'
               }`}
             >
               {accuracy}% Accuracy
@@ -106,8 +108,8 @@ export default function ReviewPage() {
         </div>
 
         {/* Filter Pills */}
-        <div className="flex items-center gap-2 mt-6 pt-6 border-t border-border">
-          <span className="text-xs font-semibold text-text-secondary mr-2">Show:</span>
+        <div className="flex flex-wrap items-center gap-2 mt-5 pt-5 border-t border-border">
+          <span className="text-xs font-semibold text-text-secondary w-full sm:w-auto mb-1 sm:mb-0">Filter by:</span>
           <button
             type="button"
             onClick={() => setFilter('all')}
@@ -117,7 +119,7 @@ export default function ReviewPage() {
                 : 'bg-bg-secondary text-text-secondary hover:text-text-primary'
             }`}
           >
-            All Questions ({items.length})
+            All Items ({items.length})
           </button>
           <button
             type="button"
@@ -128,7 +130,7 @@ export default function ReviewPage() {
                 : 'bg-bg-secondary text-text-secondary hover:text-danger'
             }`}
           >
-            <XCircle className="w-3 h-3" /> Mistakes Only ({items.filter((i) => !i.isCorrect).length})
+            <XCircle className="w-3 h-3" /> Mistakes ({items.filter((i) => !i.isCorrect).length})
           </button>
           <button
             type="button"

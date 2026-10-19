@@ -2,6 +2,7 @@
   "name": "reviewsite",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "description": "ECT Licensure & Pre-board Exam Review App",
   "scripts": {
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",

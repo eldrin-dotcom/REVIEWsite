@@ -355,26 +355,26 @@ export default function ExamPage() {
   return (
     <div className="space-y-5">
       {/* Exam Header: Question Count & Countdown Timer */}
-      <div className="bg-card border border-border rounded-2xl p-4 sm:p-5 flex items-center justify-between shadow-sm sticky top-16 z-30 backdrop-blur-md bg-opacity-95">
-        <div>
-          <span className="text-xs font-semibold uppercase tracking-wider text-text-secondary block">
-            Licensure Mock Exam
+      <div className="bg-card border border-border rounded-2xl p-3 sm:p-5 flex items-center justify-between gap-2 shadow-sm sticky top-16 z-30 backdrop-blur-md bg-opacity-95">
+        <div className="min-w-0">
+          <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-text-secondary block truncate">
+            Mock Exam
           </span>
-          <span className="text-base sm:text-lg font-bold text-text-primary">
-            Question {currentIndex + 1} of {questions.length}
+          <span className="text-sm sm:text-lg font-bold text-text-primary whitespace-nowrap">
+            Q{currentIndex + 1} <span className="text-xs font-normal text-text-secondary">/ {questions.length}</span>
           </span>
         </div>
 
-        {/* Timer Box */}
-        <div className="flex items-center gap-3">
+        {/* Timer Box & Action */}
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <div
-            className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl border font-mono font-bold text-base sm:text-xl flex items-center gap-2 transition ${
+            className={`px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-xl border font-mono font-bold text-xs sm:text-lg flex items-center gap-1.5 sm:gap-2 transition ${
               isTimeLow
                 ? 'bg-danger/15 border-danger text-danger animate-pulse'
                 : 'bg-bg-secondary border-border text-text-primary'
             }`}
           >
-            <Timer className={`w-5 h-5 ${isTimeLow ? 'text-danger' : 'text-primary'}`} />
+            <Timer className={`w-3.5 h-3.5 sm:w-5 sm:h-5 ${isTimeLow ? 'text-danger' : 'text-primary'}`} />
             <span>{formatTime(secondsRemaining)}</span>
           </div>
 
@@ -382,9 +382,10 @@ export default function ExamPage() {
             type="button"
             onClick={() => handleSubmitExam(false)}
             disabled={submittingExam}
-            className="py-2 px-4 rounded-xl font-bold text-xs sm:text-sm text-white bg-success hover:opacity-90 transition shadow-sm whitespace-nowrap flex items-center gap-1.5"
+            className="py-1.5 sm:py-2 px-3 sm:px-4 rounded-xl font-bold text-xs sm:text-sm text-white bg-success hover:opacity-90 active:scale-95 transition shadow-sm whitespace-nowrap flex items-center gap-1"
           >
-            <CheckCircle2 className="w-4 h-4" /> Submit Exam
+            <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <span>Submit</span>
           </button>
         </div>
       </div>

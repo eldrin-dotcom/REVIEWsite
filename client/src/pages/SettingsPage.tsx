@@ -1,11 +1,11 @@
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { Palette, Sun, Moon, Heart, User, Trophy, Check, RotateCcw, AlertTriangle, Lock, KeyRound } from 'lucide-react';
+import { Palette, Sun, Moon, Heart, User, Trophy, Check, RotateCcw, AlertTriangle, Lock, KeyRound, LogOut } from 'lucide-react';
 import { useState } from 'react';
 import type { Theme } from 'shared';
 
 export default function SettingsPage() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { theme, setTheme } = useTheme();
   const [resetting, setResetting] = useState(false);
   const [resetStatus, setResetStatus] = useState('');
@@ -215,6 +215,14 @@ export default function SettingsPage() {
             Goal: <strong>Top Notcher</strong> in the Electronics Technician Licensure Examination
           </span>
         </div>
+
+        <button
+          type="button"
+          onClick={logout}
+          className="w-full py-2.5 px-4 rounded-xl border border-danger/20 text-danger bg-danger/10 hover:bg-danger hover:text-white font-bold text-xs transition flex items-center justify-center gap-2 active:scale-95"
+        >
+          <LogOut className="w-4 h-4" /> Log Out of Account
+        </button>
       </div>
 
       {/* Account Security / Change Password */}

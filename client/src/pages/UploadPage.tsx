@@ -245,7 +245,7 @@ export default function UploadPage() {
         <button
           type="button"
           onClick={handleDownloadSample}
-          className="py-2.5 px-4 rounded-xl border border-border bg-bg-secondary hover:bg-card text-text-primary text-xs font-bold transition flex items-center gap-2 whitespace-nowrap shadow-xs"
+          className="w-full sm:w-auto py-2.5 px-4 rounded-xl border border-border bg-bg-secondary hover:bg-card text-text-primary text-xs font-bold transition flex items-center justify-center gap-2 whitespace-nowrap shadow-xs"
         >
           <Download className="w-4 h-4 text-primary" /> Download JSON Template
         </button>

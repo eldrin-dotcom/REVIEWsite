@@ -117,17 +117,19 @@ export default function Layout({ children }: LayoutProps) {
             </div>
 
             {/* User display & logout */}
-            <div className="hidden sm:flex items-center gap-2.5 pl-2.5 border-l border-border">
-              <span className="text-sm font-semibold text-text-primary">
+            <div className="flex items-center gap-1.5 sm:gap-2.5 pl-2 sm:pl-2.5 border-l border-border">
+              <span className="hidden sm:inline-block text-sm font-semibold text-text-primary">
                 {user?.displayName}
               </span>
               <button
                 type="button"
                 onClick={logout}
-                className="text-text-secondary hover:text-danger p-1.5 rounded-lg transition"
+                className="text-danger p-1.5 rounded-xl border border-danger/20 bg-danger/10 hover:bg-danger hover:text-white transition active:scale-95 flex items-center gap-1"
                 title="Log out"
+                aria-label="Log out"
               >
-                <LogOut className="w-4 h-4" />
+                <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span className="text-[11px] font-bold sm:hidden">Exit</span>
               </button>
             </div>
           </div>
