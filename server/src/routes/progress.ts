@@ -21,14 +21,24 @@ progressRouter.get('/overview', async (req: AuthenticatedRequest, res: Response)
 
     const completedSessions = userSessions.filter(s => s.completed);
 
-    let totalQuestions = 0;
-    let totalCorrect = 0;
+    // Count all answers logged by this user across all sessions
+    const userAnswers = await db
+      .select({
+        id: quizAnswers.id,
+        isCorrect: quizAnswers.isCorrect,
+      })
+      .from(quizAnswers)
+      .innerJoin(quizSessions, eq(quizAnswers.sessionId, quizSessions.id))
+      .where(
+        and(
+          eq(quizSessions.userId, userId),
+          sql`${quizAnswers.selectedAnswer} IS NOT NULL`
+        )
+      )
+      .all();
 
-    for (const s of completedSessions) {
-      totalQuestions += s.totalQuestions;
-      totalCorrect += s.correctAnswers;
-    }
-
+    const totalQuestions = userAnswers.length;
+    const totalCorrect = userAnswers.filter(a => a.isCorrect).length;
     const overallAccuracy = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
     const practiceSessions = completedSessions.filter(s => s.mode === 'practice').length;
     const examSessions = completedSessions.filter(s => s.mode === 'exam').length;
@@ -263,17 +273,27 @@ progressRouter.delete('/reset', async (req: AuthenticatedRequest, res: Response)
   }
 });
 
-// Helper to get local Philippine/UTC+8 date string (YYYY-MM-DD)
-function getLocalDateStr(d = new Date()): string {
-  const phTime = new Date(d.getTime() + 8 * 60 * 60 * 1000);
-  return phTime.toISOString().slice(0, 10);
+// Reliable Philippine/UTC+8 date formatter (YYYY-MM-DD)
+const manilaDateFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Manila',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+function getManilaDateStr(daysAgo = 0): string {
+  const d = new Date();
+  if (daysAgo !== 0) {
+    d.setDate(d.getDate() - daysAgo);
+  }
+  return manilaDateFormatter.format(d);
 }
 
 // Duo Streak & Dino Pet endpoint
 progressRouter.get('/duo-streak', async (_req: AuthenticatedRequest, res: Response) => {
   try {
     const db = getDb();
-    const todayStr = getLocalDateStr();
+    const todayStr = getManilaDateStr(0);
 
     // 1. Fetch John & Hon user records
     const allUsers = await db
@@ -294,18 +314,19 @@ progressRouter.get('/duo-streak', async (_req: AuthenticatedRequest, res: Respon
     const dinoName = settingsMap.get('dino_pet_name') || 'Rexy';
 
     // 3. Count daily answers per user across all dates
-    // Groups by userId and date string (YYYY-MM-DD)
+    // Converts UTC timestamps to local Philippine time (UTC+8) using SQLite date(ts, '+8 hours')
     const dailyGroupCounts = await db
       .select({
         userId: quizSessions.userId,
-        dateStr: sql<string>`substr(coalesce(${quizAnswers.answeredAt}, ${quizSessions.startedAt}), 1, 10)`,
+        dateStr: sql<string>`date(coalesce(${quizAnswers.answeredAt}, ${quizSessions.startedAt}), '+8 hours')`,
         count: sql<number>`count(*)`,
       })
       .from(quizAnswers)
       .innerJoin(quizSessions, eq(quizAnswers.sessionId, quizSessions.id))
+      .where(sql`${quizAnswers.selectedAnswer} IS NOT NULL`)
       .groupBy(
         quizSessions.userId,
-        sql`substr(coalesce(${quizAnswers.answeredAt}, ${quizSessions.startedAt}), 1, 10)`
+        sql`date(coalesce(${quizAnswers.answeredAt}, ${quizSessions.startedAt}), '+8 hours')`
       )
       .all();
 
@@ -314,6 +335,41 @@ progressRouter.get('/duo-streak', async (_req: AuthenticatedRequest, res: Respon
       if (row.userId && row.dateStr) {
         countMap.set(`${row.userId}:${row.dateStr}`, Number(row.count) || 0);
       }
+    }
+
+    // Helper to calculate an individual user's consecutive day streak
+    function getUserStreak(userId: number): number {
+      const isUserDaySuccessful = (dateStr: string) => {
+        const c = countMap.get(`${userId}:${dateStr}`) || 0;
+        return c >= 10;
+      };
+
+      const userDoneToday = isUserDaySuccessful(todayStr);
+      let streak = 0;
+
+      if (userDoneToday) {
+        streak++;
+        for (let daysAgo = 1; daysAgo <= 365; daysAgo++) {
+          const prevDate = getManilaDateStr(daysAgo);
+          if (isUserDaySuccessful(prevDate)) {
+            streak++;
+          } else {
+            break;
+          }
+        }
+      } else {
+        // Today not complete yet; count active streak through yesterday
+        for (let daysAgo = 1; daysAgo <= 365; daysAgo++) {
+          const prevDate = getManilaDateStr(daysAgo);
+          if (isUserDaySuccessful(prevDate)) {
+            streak++;
+          } else {
+            break;
+          }
+        }
+      }
+
+      return streak;
     }
 
     // 4. Calculate today's status for each user
@@ -326,6 +382,7 @@ progressRouter.get('/duo-streak', async (_req: AuthenticatedRequest, res: Respon
         answeredToday,
         targetToday: 10,
         completedToday: answeredToday >= 10,
+        currentStreak: getUserStreak(u.id),
       };
     });
 
@@ -341,30 +398,33 @@ progressRouter.get('/duo-streak', async (_req: AuthenticatedRequest, res: Respon
     }
 
     let currentStreak = 0;
-    const checkDate = new Date(Date.now() + 8 * 60 * 60 * 1000);
 
     if (completedToday) {
       currentStreak++;
-      checkDate.setDate(checkDate.getDate() - 1);
+      // Walk backwards through previous days starting yesterday
+      for (let daysAgo = 1; daysAgo <= 365; daysAgo++) {
+        const prevDateStr = getManilaDateStr(daysAgo);
+        if (isDuoDaySuccessful(prevDateStr)) {
+          currentStreak++;
+        } else {
+          break;
+        }
+      }
     } else {
-      checkDate.setDate(checkDate.getDate() - 1);
-    }
-
-    // Walk backwards through previous days
-    for (let i = 0; i < 365; i++) {
-      const prevDateStr = checkDate.toISOString().slice(0, 10);
-      if (isDuoDaySuccessful(prevDateStr)) {
-        currentStreak++;
-        checkDate.setDate(checkDate.getDate() - 1);
-      } else {
-        break;
+      // Walk backwards through previous days starting yesterday
+      for (let daysAgo = 1; daysAgo <= 365; daysAgo++) {
+        const prevDateStr = getManilaDateStr(daysAgo);
+        if (isDuoDaySuccessful(prevDateStr)) {
+          currentStreak++;
+        } else {
+          break;
+        }
       }
     }
 
     // If streak is active from yesterday but not completed yet today, it is at risk
-    const yesterdayDate = new Date(Date.now() + 8 * 60 * 60 * 1000);
-    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-    const yesterdaySuccessful = isDuoDaySuccessful(yesterdayDate.toISOString().slice(0, 10));
+    const yesterdayDateStr = getManilaDateStr(1);
+    const yesterdaySuccessful = isDuoDaySuccessful(yesterdayDateStr);
     const atRisk = !completedToday && yesterdaySuccessful;
 
     // 6. Dino Pet Stage & Mood

@@ -234,6 +234,7 @@ export interface DuoUserProgress {
   answeredToday: number;
   targetToday: number;
   completedToday: boolean;
+  currentStreak?: number;
 }
 
 export type DinoStage = 'egg' | 'baby' | 'study' | 'tech' | 'top_notcher';

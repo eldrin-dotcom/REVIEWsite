@@ -74,12 +74,14 @@ export default function DinoPetCard({ streakData, currentUsername }: DinoPetCard
     answeredToday: 0,
     targetToday: 10,
     completedToday: false,
+    currentStreak: 0,
   };
   const hon = users.find((u) => u.username === 'emma') || {
     displayName: 'Hon',
     answeredToday: 0,
     targetToday: 10,
     completedToday: false,
+    currentStreak: 0,
   };
 
   const handlePetDino = () => {
@@ -107,12 +109,12 @@ export default function DinoPetCard({ streakData, currentUsername }: DinoPetCard
     speechText = 'ROAAR! 🦖 Duo streak saved for today! You two are an unstoppable duo!';
   } else if (john.completedToday && !hon.completedToday) {
     speechText = currentUsername === 'emma'
-      ? `John finished his 10! Rexy needs ${10 - hon.answeredToday} more questions from you to save our streak! Let's go Hon! 💖`
-      : `You finished your 10! Rexy is waiting for Hon (${hon.answeredToday}/10) to save our streak today! ⏳`;
+      ? `John finished his 10 (${john.answeredToday} answered)! Rexy needs ${Math.max(0, 10 - hon.answeredToday)} more question(s) from you to save our streak! Let's go Hon! 💖`
+      : `You finished your 10 (${john.answeredToday} answered)! Rexy is waiting for Hon (${hon.answeredToday}/10) to save our streak today! ⏳`;
   } else if (hon.completedToday && !john.completedToday) {
     speechText = currentUsername === 'john'
-      ? `Hon finished her 10! Rexy needs ${10 - john.answeredToday} more questions from you to save our streak! Let's go John! ⚡`
-      : `You finished your 10! Rexy is waiting for John (${john.answeredToday}/10) to save our streak today! ⏳`;
+      ? `Hon finished her 10 (${hon.answeredToday} answered)! Rexy needs ${Math.max(0, 10 - john.answeredToday)} more question(s) from you to save our streak! Let's go John! ⚡`
+      : `You finished your 10 (${hon.answeredToday} answered)! Rexy is waiting for John (${john.answeredToday}/10) to save our streak today! ⏳`;
   } else {
     speechText = currentStreak > 0
       ? `Rexy is shivering in his egg... 🥺 Both of you need 10 questions today to keep our ${currentStreak}-day streak and make him happy!`
@@ -292,11 +294,16 @@ export default function DinoPetCard({ streakData, currentUsername }: DinoPetCard
                     <span className="flex items-center gap-1.5 text-text-primary">
                       <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
                       John
+                      {john.currentStreak && john.currentStreak > 0 ? (
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-500 border border-amber-500/25">
+                          🔥 {john.currentStreak}d streak
+                        </span>
+                      ) : null}
                     </span>
                     <span className={john.completedToday ? 'text-success font-bold flex items-center gap-1' : 'text-text-secondary'}>
                       {john.completedToday ? (
                         <>
-                          <CheckCircle2 className="w-3.5 h-3.5" /> 10 / 10 Completed
+                          <CheckCircle2 className="w-3.5 h-3.5" /> {john.answeredToday} / 10 Completed
                         </>
                       ) : (
                         `${john.answeredToday} / 10 questions`
@@ -319,11 +326,16 @@ export default function DinoPetCard({ streakData, currentUsername }: DinoPetCard
                     <span className="flex items-center gap-1.5 text-text-primary">
                       <Heart className="w-3 h-3 text-rose-500 fill-rose-500 inline-block" />
                       Hon
+                      {hon.currentStreak && hon.currentStreak > 0 ? (
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-500 border border-amber-500/25">
+                          🔥 {hon.currentStreak}d streak
+                        </span>
+                      ) : null}
                     </span>
                     <span className={hon.completedToday ? 'text-rose-500 font-bold flex items-center gap-1' : 'text-text-secondary'}>
                       {hon.completedToday ? (
                         <>
-                          <CheckCircle2 className="w-3.5 h-3.5" /> 10 / 10 Completed
+                          <CheckCircle2 className="w-3.5 h-3.5" /> {hon.answeredToday} / 10 Completed
                         </>
                       ) : (
                         `${hon.answeredToday} / 10 questions`
